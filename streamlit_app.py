@@ -354,10 +354,18 @@ st.sidebar.markdown(
     unsafe_allow_html=True
 )
 
+import os
+
+default_api_url = "http://127.0.0.1:8000/api/v1"
+if "API_BASE_URL" in os.environ:
+    default_api_url = os.environ["API_BASE_URL"]
+elif hasattr(st, "secrets") and "API_BASE_URL" in st.secrets:
+    default_api_url = st.secrets["API_BASE_URL"]
+
 API_BASE_URL = st.sidebar.text_input(
     "API Host",
-    value="http://127.0.0.1:8000/api/v1",
-    help="FastAPI backend endpoint"
+    value=default_api_url,
+    help="FastAPI backend endpoint (e.g. https://chef-api.onrender.com/api/v1)"
 )
 
 def check_health():
