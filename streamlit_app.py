@@ -2,137 +2,316 @@ import streamlit as st
 import requests
 
 # -----------------------------------------------------------------------------
-# PAGE CONFIGURATION & THEME
+# PAGE CONFIGURATION & ELEGANT ALL-WHITE THEME
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Chef AI — Smart Cooking Companion",
-    page_icon="🍳",
+    page_title="Chef AI — Culinary Companion",
+    page_icon="🍽️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom Design System (Warm Desi Culinary & Modern Glassmorphism Theme)
-CUSTOM_CSS = """
+# Custom Elegant All-White Design System
+ELEGANT_WHITE_CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,600&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
 
-html, body, [class*="css"] {
+/* Force Clean All-White Canvas */
+html, body, [data-testid="stAppViewContainer"], .stApp {
+    background-color: #FFFFFF !important;
+    background: #FFFFFF !important;
+    color: #0F172A !important;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    -webkit-font-smoothing: antialiased;
+}
+
+[data-testid="stHeader"] {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(8px);
+}
+
+.block-container {
+    padding-top: 2.2rem !important;
+    padding-bottom: 2.5rem !important;
+}
+
+/* Headings with Rich Editorial Serifs */
+h1 {
+    font-family: 'Playfair Display', 'Fraunces', serif !important;
+    color: #0F172A !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.03em !important;
+}
+
+h2, h3 {
+    font-family: 'Playfair Display', 'Fraunces', serif !important;
+    color: #1E293B !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.02em !important;
+}
+
+h4, h5, h6 {
+    font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif !important;
+    color: #334155 !important;
+    font-weight: 600 !important;
+}
+
+p, span, label {
     font-family: 'Plus Jakarta Sans', sans-serif;
+    color: #334155;
 }
 
-h1, h2, h3, h4, .brand-font {
-    font-family: 'Outfit', sans-serif !important;
-    letter-spacing: -0.02em;
-}
-
-/* App Background subtle radial glow */
-.stApp {
-    background-color: #0d0f15;
-    background-image: radial-gradient(circle at 15% 10%, rgba(245, 158, 11, 0.07) 0%, transparent 40%),
-                      radial-gradient(circle at 85% 85%, rgba(239, 68, 68, 0.05) 0%, transparent 45%);
-}
-
-/* Sidebar styling */
+/* Sidebar: Crisp Editorial White with Subtle Slate Border */
 [data-testid="stSidebar"] {
-    background-color: #12151e !important;
-    border-right: 1px solid rgba(255, 255, 255, 0.07);
+    background-color: #FAFAFA !important;
+    border-right: 1px solid #E2E8F0 !important;
+    box-shadow: 1px 0 10px rgba(0, 0, 0, 0.02) !important;
 }
 
-/* Card Containers */
-.chef-card {
-    background: #171b26;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 16px;
-    padding: 20px 24px;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+[data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
+    color: #0F172A !important;
 }
 
+[data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label {
+    color: #475569 !important;
+}
+
+/* Elegant Cards styling using Streamlit bordered containers */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    background-color: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 20px !important;
+    padding: 24px 28px !important;
+    box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02) !important;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"]:hover {
+    border-color: #CBD5E1 !important;
+    box-shadow: 0 12px 30px -4px rgba(15, 23, 42, 0.09) !important;
+    transform: translateY(-2px);
+}
+
+/* Active Step Hero Card */
 .step-hero-card {
-    background: linear-gradient(135deg, rgba(30, 36, 52, 0.95) 0%, rgba(20, 24, 36, 0.95) 100%);
-    border: 1px solid rgba(245, 158, 11, 0.25);
-    border-radius: 16px;
-    padding: 22px 26px;
-    margin-bottom: 18px;
-    box-shadow: 0 8px 30px rgba(245, 158, 11, 0.06);
+    background: #FFFFFF;
+    border: 1px solid #FED7AA;
+    border-left: 6px solid #EA580C;
+    border-radius: 18px;
+    padding: 26px 30px;
+    margin-bottom: 22px;
+    box-shadow: 0 6px 24px -2px rgba(234, 88, 12, 0.08), 0 2px 6px rgba(0,0,0,0.02);
 }
 
-/* Badges & Tags */
+/* Badges & Pills in Harmonious Culinary Colors */
 .badge-pill {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 12px;
-    border-radius: 20px;
+    padding: 5px 14px;
+    border-radius: 30px;
+    font-family: 'Outfit', sans-serif;
     font-size: 0.8rem;
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.badge-active {
-    background: rgba(16, 185, 129, 0.15);
-    color: #34d399;
-    border: 1px solid rgba(16, 185, 129, 0.3);
+    letter-spacing: 0.02em;
 }
 
 .badge-pakistani {
-    background: rgba(245, 158, 11, 0.12);
-    color: #fbbf24;
-    border: 1px solid rgba(245, 158, 11, 0.25);
+    background: #ECFDF5;
+    color: #047857;
+    border: 1px solid #A7F3D0;
 }
 
-.badge-step {
-    background: rgba(59, 130, 246, 0.15);
-    color: #60a5fa;
-    border: 1px solid rgba(59, 130, 246, 0.3);
+.badge-time {
+    background: #FFFBEB;
+    color: #B45309;
+    border: 1px solid #FDE68A;
 }
 
-/* Quick Action Buttons */
-.quick-prompt-btn {
-    display: inline-block;
-    padding: 6px 14px;
-    margin: 4px 4px 6px 0;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 12px;
-    color: #e2e8f0;
-    font-size: 0.84rem;
-    text-decoration: none;
-    cursor: pointer;
-    transition: all 0.2s ease;
+.badge-servings {
+    background: #EFF6FF;
+    color: #1D4ED8;
+    border: 1px solid #BFDBFE;
 }
 
-/* Custom progress bar */
-.stProgress > div > div > div > div {
-    background-color: #f59e0b !important;
+.badge-active {
+    background: #FEF3C7;
+    color: #D97706;
+    border: 1px solid #FCD34D;
 }
 
-/* Metric styling */
+.badge-step-num {
+    background: #FFF7ED;
+    color: #C2410C;
+    border: 1px solid #FFEDD5;
+    font-weight: 800;
+}
+
+/* Metric Cards */
+[data-testid="stMetric"] {
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 16px !important;
+    padding: 14px 18px !important;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03) !important;
+}
+
 [data-testid="stMetricValue"] {
-    font-family: 'Outfit', sans-serif !important;
-    font-size: 1.8rem !important;
-    color: #f59e0b !important;
+    font-family: 'Fraunces', 'Playfair Display', serif !important;
+    color: #EA580C !important;
+    font-size: 1.75rem !important;
+    font-weight: 700 !important;
 }
 
-/* Chat bubble styling */
-.chat-badge {
-    display: inline-block;
-    font-size: 0.72rem;
-    font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 6px;
-    margin-top: 6px;
+[data-testid="stMetricLabel"] {
+    font-family: 'Outfit', sans-serif !important;
+    color: #64748B !important;
+    font-size: 0.8rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
 }
-.badge-executed { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-.badge-answered { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
-.badge-clarify  { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+
+/* Progress Bar */
+.stProgress > div > div > div > div {
+    background: linear-gradient(90deg, #EA580C 0%, #F59E0B 100%) !important;
+    border-radius: 10px !important;
+}
+
+/* Primary Button Styling (Vibrant Saffron/Terracotta, readable bold white text) */
+button[kind="primary"] {
+    background: linear-gradient(135deg, #EA580C 0%, #C2410C 100%) !important;
+    border: none !important;
+    border-radius: 14px !important;
+    padding: 12px 24px !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 0.95rem !important;
+    letter-spacing: 0.02em !important;
+    box-shadow: 0 4px 14px rgba(234, 88, 12, 0.25) !important;
+    transition: all 0.2s ease !important;
+}
+
+button[kind="primary"] *, 
+button[kind="primary"] p, 
+button[kind="primary"] span, 
+button[kind="primary"] div,
+[data-testid="stSidebar"] button[kind="primary"] *,
+[data-testid="stSidebar"] button[kind="primary"] p {
+    color: #FFFFFF !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 700 !important;
+}
+
+button[kind="primary"]:hover {
+    background: linear-gradient(135deg, #C2410C 0%, #9A3412 100%) !important;
+    box-shadow: 0 6px 20px rgba(234, 88, 12, 0.35) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* Secondary Button Styling */
+button[kind="secondary"] {
+    background-color: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
+    border-radius: 12px !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 600 !important;
+    font-size: 0.88rem !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02) !important;
+    transition: all 0.18s ease !important;
+}
+
+button[kind="secondary"] *,
+button[kind="secondary"] p,
+button[kind="secondary"] span {
+    color: #1E293B !important;
+}
+
+button[kind="secondary"]:hover {
+    background-color: #FFF7ED !important;
+    border-color: #FDBA74 !important;
+    color: #EA580C !important;
+}
+
+button[kind="secondary"]:hover * {
+    color: #EA580C !important;
+}
+
+/* Chat Messages */
+[data-testid="stChatMessage"] {
+    background-color: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 18px !important;
+    padding: 18px 22px !important;
+    margin-bottom: 14px !important;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03) !important;
+}
+
+[data-testid="stChatMessage"] p {
+    color: #1E293B !important;
+    font-size: 0.95rem !important;
+    line-height: 1.6 !important;
+}
+
+/* Chat Input Bar */
+[data-testid="stChatInput"] {
+    border-radius: 16px !important;
+    border: 1px solid #CBD5E1 !important;
+    background-color: #FFFFFF !important;
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06) !important;
+}
+
+[data-testid="stChatInput"]:focus-within {
+    border-color: #EA580C !important;
+    box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.15) !important;
+}
+
+/* Tabs */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 8px !important;
+    background-color: transparent !important;
+    border-bottom: 2px solid #F1F5F9 !important;
+}
+
+.stTabs [data-baseweb="tab"] {
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 0.9rem !important;
+    color: #64748B !important;
+    border-radius: 8px 8px 0 0 !important;
+    padding: 10px 18px !important;
+}
+
+.stTabs [aria-selected="true"] {
+    color: #EA580C !important;
+    border-bottom: 3px solid #EA580C !important;
+}
+
+/* Decision Status Tags in Chat */
+.decision-tag {
+    display: inline-block;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 3px 12px;
+    border-radius: 20px;
+    margin-top: 8px;
+}
+.tag-execute { background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
+.tag-answer  { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
+.tag-clarify { background: #FFFBEB; color: #B45309; border: 1px solid #FDE68A; }
+
+/* Checkboxes */
+[data-testid="stCheckbox"] label span {
+    font-size: 0.94rem !important;
+    color: #1E293B !important;
+}
 </style>
 """
-st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+st.markdown(ELEGANT_WHITE_CSS, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# STATE INITIALIZATION
+# APPLICATION STATE
 # -----------------------------------------------------------------------------
 if "session_id" not in st.session_state:
     st.session_state.session_id = None
@@ -158,15 +337,17 @@ if "pending_quick_message" not in st.session_state:
     st.session_state.pending_quick_message = None
 
 # -----------------------------------------------------------------------------
-# API HELPERS
+# SIDEBAR / NAVIGATION
 # -----------------------------------------------------------------------------
 st.sidebar.markdown(
     """
-    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
-        <span style="font-size:32px;">👨‍🍳</span>
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+        <div style="width:40px; height:40px; border-radius:10px; background:#FEF3C7; display:flex; align-items:center; justify-content:center; font-size:22px; border:1px solid #FDE68A;">
+            👨‍🍳
+        </div>
         <div>
-            <h2 class="brand-font" style="margin:0; font-size:22px; color:#f59e0b;">Chef AI</h2>
-            <span style="font-size:12px; color:#94a3b8; letter-spacing:0.04em;">Desi Cooking Companion 🇵🇰</span>
+            <h2 class="editorial-serif" style="margin:0; font-size:22px; color:#0F172A;">Chef AI</h2>
+            <div style="font-size:12px; color:#64748B; font-weight:500;">Desi Culinary Assistant</div>
         </div>
     </div>
     """,
@@ -174,12 +355,12 @@ st.sidebar.markdown(
 )
 
 API_BASE_URL = st.sidebar.text_input(
-    "API Endpoint",
+    "API Host",
     value="http://127.0.0.1:8000/api/v1",
-    help="FastAPI backend base URL"
+    help="FastAPI backend endpoint"
 )
 
-def check_backend_health():
+def check_health():
     try:
         r = requests.get(f"{API_BASE_URL}/health", timeout=2)
         if r.status_code == 200:
@@ -188,11 +369,11 @@ def check_backend_health():
         pass
     return False, None
 
-is_healthy, app_version = check_backend_health()
+is_healthy, app_ver = check_health()
 if is_healthy:
-    st.sidebar.markdown(f'<div class="badge-pill badge-active">● Connected v{app_version}</div>', unsafe_allow_html=True)
+    st.sidebar.markdown(f'<span class="badge-pill" style="background:#F0FDF4; color:#15803D; border:1px solid #BBF7D0;">● System Online v{app_ver}</span>', unsafe_allow_html=True)
 else:
-    st.sidebar.markdown('<div class="badge-pill" style="background:rgba(239,68,68,0.15); color:#f87171;">● Backend Offline</div>', unsafe_allow_html=True)
+    st.sidebar.markdown('<span class="badge-pill" style="background:#FEF2F2; color:#B91C1C; border:1px solid #FECACA;">● Backend Disconnected</span>', unsafe_allow_html=True)
     st.sidebar.caption("Run: `.venv\\Scripts\\python -m uvicorn app.main:app --reload`")
 
 def fetch_recipes():
@@ -204,11 +385,11 @@ def fetch_recipes():
         pass
     return []
 
-def start_new_session(recipe_id: int, servings: int):
+def start_new_session(recipe_id: int, servings_count: int):
     try:
         res = requests.post(
             f"{API_BASE_URL}/sessions",
-            json={"recipe_id": recipe_id, "servings": servings},
+            json={"recipe_id": recipe_id, "servings": servings_count},
             timeout=8
         )
         if res.status_code == 201:
@@ -233,95 +414,92 @@ def start_new_session(recipe_id: int, servings: int):
             st.session_state.chat_history = [
                 {
                     "role": "assistant",
-                    "content": f"**Assalam-o-Alaikum!** Ready to cook authentic **{data['recipe_name']}** ({servings} servings)?\n\nI will guide you step by step with exact ingredient quantities. Feel free to talk to me naturally in **English, Urdu, or Roman Urdu**!",
+                    "content": f"**Assalam-o-Alaikum!** I'm your dedicated Chef companion for **{data['recipe_name']}** ({servings_count} servings).\n\nWhenever you're ready, let's begin with **Step 1**. Feel free to talk to me naturally in **English, Urdu, or Roman Urdu**!",
                     "decision": "session_start"
                 }
             ]
-            st.toast(f"Session #{data['id']} started for {data['recipe_name']}!", icon="🔥")
+            st.toast(f"Cooking Session #{data['id']} Ready!", icon="✨")
         else:
             st.sidebar.error(f"Failed to start session: {res.text}")
     except Exception as e:
         st.sidebar.error(f"Request failed: {e}")
 
-# -----------------------------------------------------------------------------
-# SIDEBAR CONTROLS
-# -----------------------------------------------------------------------------
-st.sidebar.markdown("---")
-st.sidebar.subheader("📖 Recipe Selection")
+st.sidebar.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+st.sidebar.markdown("<h4 style='font-size:14px; text-transform:uppercase; letter-spacing:0.06em; color:#64748B;'>Select Recipe</h4>", unsafe_allow_html=True)
 
 recipes = fetch_recipes()
 recipe_map = {f"{r['name']} ({r['cuisine']})": r for r in recipes}
 
 if recipe_map:
-    selected_name = st.sidebar.selectbox("Choose a Recipe", list(recipe_map.keys()))
+    selected_name = st.sidebar.selectbox("Recipe", list(recipe_map.keys()), label_visibility="collapsed")
     selected_recipe = recipe_map[selected_name]
 
-    col_serv, col_time = st.sidebar.columns(2)
-    with col_serv:
+    c_serv, c_time = st.sidebar.columns(2)
+    with c_serv:
         servings = st.number_input("Servings", min_value=1, max_value=20, value=selected_recipe.get("default_servings", 4))
-    with col_time:
-        total_time = (selected_recipe.get("prep_time_minutes") or 0) + (selected_recipe.get("cook_time_minutes") or 0)
-        st.metric("Total Time", f"~{total_time}m")
+    with c_time:
+        tot_time = (selected_recipe.get("prep_time_minutes") or 0) + (selected_recipe.get("cook_time_minutes") or 0)
+        st.metric("Total Time", f"{tot_time}m")
 
-    if st.sidebar.button("🍳 Start / Reset Session", use_container_width=True, type="primary"):
+    if st.sidebar.button("Start Cooking Session", use_container_width=True, type="primary"):
         start_new_session(selected_recipe["id"], servings)
 else:
-    st.sidebar.info("No recipes found in catalog. Ensure database is seeded.")
+    st.sidebar.info("No recipes loaded. Verify database seed.")
 
-st.sidebar.markdown("---")
-with st.sidebar.expander("🗣️ Conversational Tips"):
+st.sidebar.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
+with st.sidebar.expander("💬 Natural Speech Examples"):
     st.markdown(
         """
-        You can talk to the Chef completely naturally:
-        - **Guidance**: *"Ab kya karna hai?"*
-        - **Declaration**: *"Step 1 mukammal ho gaya"*
-        - **Culinary Advice**: *"Oil kitna garam hona chahiye?"*
-        - **Substitutions**: *"Can I use ghee instead?"*
-        - **Ingredients**: *"Is step mein kitni mirch daalni hai?"*
+        - *"Ab aage kya karna hai?"*
+        - *"Step 1 mukammal ho gaya"*
+        - *"Oil kitna garam hona chahiye?"*
+        - *"Can I substitute with butter?"*
+        - *"Is step mein kitne masalay daalne hain?"*
         """
     )
 
 # -----------------------------------------------------------------------------
-# MAIN DASHBOARD LAYOUT
+# MAIN INTERFACE
 # -----------------------------------------------------------------------------
 if st.session_state.session_id:
-    # Top Bar: Session Info & Metrics
-    header_col1, header_col2, header_col3 = st.columns([3, 1, 1])
-    with header_col1:
+    # Top Session Header Bar
+    head_col1, head_col2, head_col3 = st.columns([3, 1.2, 1.2])
+    with head_col1:
         st.markdown(
             f"""
-            <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
-                <h1 style="margin:0; font-size:32px;">{st.session_state.recipe_name}</h1>
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:6px;">
+                <h1 class="editorial-serif" style="margin:0; font-size:32px; color:#0F172A;">{st.session_state.recipe_name}</h1>
                 <span class="badge-pill badge-pakistani">🇵🇰 Pakistani</span>
                 <span class="badge-pill badge-active">● {st.session_state.session_status}</span>
             </div>
+            <div style="font-size:13px; color:#64748B;">Authoritative Step-by-Step Cooking Guide</div>
             """,
             unsafe_allow_html=True
         )
-    with header_col2:
-        st.metric("Active Step", f"Step {st.session_state.current_step_number} of {st.session_state.total_steps}")
-    with header_col3:
-        progress_val = min(1.0, max(0.0, st.session_state.current_step_number / max(1, st.session_state.total_steps)))
-        dur_mins = round(st.session_state.est_duration / 60) if st.session_state.est_duration else None
-        st.metric("Step Duration", f"~{dur_mins} mins" if dur_mins else "Flexible")
+    with head_col2:
+        st.metric("Current Progress", f"Step {st.session_state.current_step_number} of {st.session_state.total_steps}")
+    with head_col3:
+        mins = round(st.session_state.est_duration / 60) if st.session_state.est_duration else None
+        st.metric("Estimated Time", f"~{mins} mins" if mins else "Self-Paced")
 
-    # Step Progress Bar
-    progress_ratio = st.session_state.current_step_number / max(1, st.session_state.total_steps)
-    st.progress(progress_ratio)
+    # Step Progress Indicator
+    progress_val = st.session_state.current_step_number / max(1, st.session_state.total_steps)
+    st.progress(progress_val)
+    st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
 
-    # TWO-COLUMN WORKSPACE: Chat Assistant (60%) vs Mise en Place / Timeline (40%)
-    col_chat, col_info = st.columns([1.2, 0.8], gap="large")
+    # TWO-COLUMN WORKSPACE: Chat (Left) vs Mise en Place (Right)
+    chat_col, right_col = st.columns([1.25, 0.85], gap="large")
 
-    with col_chat:
-        # Active Step Hero Banner
+    with chat_col:
+        # Active Step Hero Card
         st.markdown(
             f"""
             <div class="step-hero-card">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <span class="badge-pill badge-step">Current Step #{st.session_state.current_step_number}</span>
-                    <span style="font-size:12px; color:#94a3b8;">Authoritative State Verified ✔</span>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <span class="badge-pill badge-step-num">Step {st.session_state.current_step_number}</span>
+                    <span style="font-size:12px; color:#64748B; font-weight:600;">Active Instruction</span>
                 </div>
-                <div style="font-size:1.15rem; font-weight:600; line-height:1.6; color:#f8fafc;">
+                <div class="editorial-serif" style="font-size:1.25rem; font-weight:600; line-height:1.6; color:#0F172A;">
                     {st.session_state.current_instruction}
                 </div>
             </div>
@@ -329,54 +507,56 @@ if st.session_state.session_id:
             unsafe_allow_html=True
         )
 
-        # Quick Suggestion Chips (Kitchen-friendly hands-free simulation)
-        st.caption("⚡ Quick Actions:")
-        chip_col1, chip_col2, chip_col3, chip_col4 = st.columns(4)
-        if chip_col1.button("✅ Step Done", use_container_width=True):
-            st.session_state.pending_quick_message = f"Step {st.session_state.current_step_number} done, next step kya hai?"
+        # Quick Action Shortcuts (Hands-Free simulation)
+        st.caption("Quick actions:")
+        btn_c1, btn_c2, btn_c3, btn_c4 = st.columns(4)
+        if btn_c1.button("✅ Done", use_container_width=True, type="secondary"):
+            st.session_state.pending_quick_message = f"Step {st.session_state.current_step_number} complete, aage kya karna hai?"
             st.rerun()
-        if chip_col2.button("🧂 Ingredients", use_container_width=True):
-            st.session_state.pending_quick_message = "Is step mein kitne ingredients daalne hain?"
+        if btn_c2.button("🧂 Items", use_container_width=True, type="secondary"):
+            st.session_state.pending_quick_message = "Is step mein kaun se ingredients aur kitni quantity dalni hai?"
             st.rerun()
-        if chip_col3.button("🔥 Heat / Temp", use_container_width=True):
-            st.session_state.pending_quick_message = "Aanch (flame) kitni honi chahiye?"
+        if btn_c3.button("🔥 Heat", use_container_width=True, type="secondary"):
+            st.session_state.pending_quick_message = "Aanch (heat flame) kitni honi chahiye?"
             st.rerun()
-        if chip_col4.button("⏭️ Skip Step", use_container_width=True):
+        if btn_c4.button("⏭️ Skip", use_container_width=True, type="secondary"):
             st.session_state.pending_quick_message = "Skip this step."
             st.rerun()
 
-        # Chat Stream
-        chat_container = st.container()
-        with chat_container:
+        st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+
+        # Chat History Container
+        chat_box = st.container()
+        with chat_box:
             for msg in st.session_state.chat_history:
                 with st.chat_message(msg["role"], avatar="👨‍🍳" if msg["role"] == "assistant" else "👤"):
                     st.markdown(msg["content"])
                     if "decision" in msg and msg["decision"]:
-                        dec = msg["decision"]
-                        badge_html = {
-                            "execute_action": '<span class="chat-badge badge-executed">🟢 Action Executed</span>',
-                            "answer_question": '<span class="chat-badge badge-answered">🔵 Question Answered</span>',
-                            "clarify": '<span class="chat-badge badge-clarify">🟠 Clarification Needed</span>',
-                            "session_start": '<span class="chat-badge badge-executed">✨ Session Initialized</span>'
-                        }.get(dec, f'<span class="chat-badge badge-answered">{dec}</span>')
-                        st.markdown(badge_html, unsafe_allow_html=True)
+                        d = msg["decision"]
+                        tag_html = {
+                            "execute_action": '<span class="decision-tag tag-execute">🟢 Action Verified</span>',
+                            "answer_question": '<span class="decision-tag tag-answer">🔵 Culinary Advice</span>',
+                            "clarify": '<span class="decision-tag tag-clarify">🟠 Clarification Requested</span>',
+                            "session_start": '<span class="decision-tag tag-execute">✨ Session Active</span>'
+                        }.get(d, f'<span class="decision-tag tag-answer">{d}</span>')
+                        st.markdown(tag_html, unsafe_allow_html=True)
 
-        # Handle either chat input or quick prompt button
-        user_prompt = st.chat_input("Speak or type in English, Roman Urdu, or Urdu...")
+        # Inbound Chat Input
+        user_input = st.chat_input("Speak or type in English, Roman Urdu, or Urdu...")
         if st.session_state.pending_quick_message:
-            user_prompt = st.session_state.pending_quick_message
+            user_input = st.session_state.pending_quick_message
             st.session_state.pending_quick_message = None
 
-        if user_prompt:
-            st.session_state.chat_history.append({"role": "user", "content": user_prompt})
+        if user_input:
+            st.session_state.chat_history.append({"role": "user", "content": user_input})
             with st.chat_message("user", avatar="👤"):
-                st.markdown(user_prompt)
+                st.markdown(user_input)
 
-            with st.spinner("Chef AI is thinking..."):
+            with st.spinner("Chef AI is reviewing your recipe state..."):
                 try:
                     res = requests.post(
                         f"{API_BASE_URL}/sessions/{st.session_state.session_id}/message",
-                        json={"message": user_prompt},
+                        json={"message": user_input},
                         timeout=30
                     )
                     if res.status_code == 200:
@@ -385,7 +565,6 @@ if st.session_state.session_id:
                         decision = data.get("decision_type", "")
                         session_info = data.get("session", {})
 
-                        # Refresh session state
                         if session_info:
                             st.session_state.current_step_number = session_info.get("current_step_number", st.session_state.current_step_number)
                             st.session_state.session_status = session_info.get("status", st.session_state.session_status)
@@ -394,7 +573,7 @@ if st.session_state.session_id:
                                 st.session_state.current_instruction = curr_step["instruction"]
                                 st.session_state.est_duration = curr_step.get("estimated_duration_seconds")
                             elif session_info.get("status") == "COMPLETED":
-                                st.session_state.current_instruction = "🎉 Recipe successfully completed! Bon Appétit / Nosh-e-Jaan!"
+                                st.session_state.current_instruction = "🎉 Recipe Completed! Nosh-e-Jaan / Enjoy your meal!"
 
                         st.session_state.chat_history.append({
                             "role": "assistant",
@@ -403,39 +582,39 @@ if st.session_state.session_id:
                         })
                         st.rerun()
                     else:
-                        st.error(f"Backend returned error ({res.status_code}): {res.text}")
+                        st.error(f"Backend Error ({res.status_code}): {res.text}")
                 except Exception as e:
                     st.error(f"Connection failed: {e}")
 
-    with col_info:
-        tab_ingredients, tab_steps, tab_notes = st.tabs(["🧂 Mise en Place", "📋 Step Roadmap", "💡 Chef Notes"])
+    with right_col:
+        tab_ing, tab_map, tab_tips = st.tabs(["🧂 Ingredients", "📋 Roadmap", "💡 Tips"])
 
-        with tab_ingredients:
-            st.markdown("#### Scaled Ingredients")
-            st.caption(f"Quantities automatically calculated for **{servings} servings**:")
+        with tab_ing:
+            st.markdown("<h4 style='font-size:16px; margin-top:8px;'>Ingredients Needed</h4>", unsafe_allow_html=True)
+            st.caption(f"Exact quantities scaled for **{servings} servings**:")
             if st.session_state.ingredients:
                 for idx, ing in enumerate(st.session_state.ingredients):
-                    qty_str = f"{ing['quantity']} {ing['unit'] or ''}".strip() if ing.get("quantity") else "To taste"
-                    notes_str = f" *({ing['notes']})*" if ing.get("notes") else ""
-                    st.checkbox(f"**{ing['ingredient_name']}** — {qty_str}{notes_str}", key=f"ing_{idx}", value=False)
+                    qty = f"**{ing['quantity']} {ing['unit'] or ''}**".strip() if ing.get("quantity") else "*To taste*"
+                    note = f" — *{ing['notes']}*" if ing.get("notes") else ""
+                    st.checkbox(f"{ing['ingredient_name']}: {qty}{note}", key=f"ing_check_{idx}", value=False)
             else:
                 st.info("Ingredients will load as you cook.")
 
-        with tab_steps:
-            st.markdown("#### Recipe Roadmap")
+        with tab_map:
+            st.markdown("<h4 style='font-size:16px; margin-top:8px;'>Recipe Timeline</h4>", unsafe_allow_html=True)
             if st.session_state.steps_list:
                 for s in st.session_state.steps_list:
-                    step_num = s["step_number"]
-                    is_current = (step_num == st.session_state.current_step_number)
-                    is_done = (step_num < st.session_state.current_step_number) or (st.session_state.session_status == "COMPLETED")
+                    s_num = s["step_number"]
+                    is_active = (s_num == st.session_state.current_step_number)
+                    is_past = (s_num < st.session_state.current_step_number) or (st.session_state.session_status == "COMPLETED")
 
-                    icon = "✅" if is_done else ("🔥" if is_current else "⏳")
-                    style_border = "border-left: 3px solid #f59e0b; padding-left: 8px; margin-bottom: 8px;" if is_current else "margin-bottom: 8px;"
+                    icon = "✅" if is_past else ("🔥" if is_active else "⏳")
+                    border_style = "border-left: 3px solid #D97706; padding-left: 10px; margin-bottom: 12px; background:#FFFBEB; padding:8px 10px; border-radius:4px;" if is_active else "margin-bottom: 12px; padding:4px 0;"
                     st.markdown(
                         f"""
-                        <div style="{style_border}">
-                            <b>{icon} Step {step_num}</b><br>
-                            <span style="font-size:0.85rem; color:#94a3b8;">{s['instruction']}</span>
+                        <div style="{border_style}">
+                            <div style="font-weight:700; font-size:0.86rem; color:#0F172A;">{icon} Step {s_num}</div>
+                            <div style="font-size:0.83rem; color:#64748B; margin-top:2px;">{s['instruction']}</div>
                         </div>
                         """,
                         unsafe_allow_html=True
@@ -443,73 +622,84 @@ if st.session_state.session_id:
             else:
                 st.caption("Steps list not available.")
 
-        with tab_notes:
-            st.markdown("#### South Asian Cooking Tips")
-            st.info(
+        with tab_tips:
+            st.markdown("<h4 style='font-size:16px; margin-top:8px;'>Authentic Cooking Notes</h4>", unsafe_allow_html=True)
+            st.markdown(
                 """
-                - **Bhunai Technique**: When bhunaoing meat or masala, wait until oil visibly separates (*tail alag ho jaye*). That is the authentic marker of depth of flavor.
-                - **Tempering (Tarka)**: Always pour hot tarka quickly into the lentils and instantly seal with lid for 1 minute to trap aromatic volatilized oils.
-                - **Fresh Ginger**: Always add julienned ginger right at the end to keep the bite and aromatics crisp.
+                - **Bhunai Principle**: The secret to deep restaurant Karahi flavor is continuous bhunai on high heat until the oil separates completely from the tomato gravy.
+                - **Garlic & Cumin Tempering**: When preparing tarka for daal, do not let sliced garlic burn dark. Pull off heat as soon as it turns light golden brown.
+                - **Fresh Garnish**: Add fresh coriander and julienned ginger after extinguishing the flame to keep maximum fragrance.
                 """
             )
 
 else:
-    # Welcome Splash Screen (No Active Session)
+    # -----------------------------------------------------------------------------
+    # WELCOME SPLASH SCREEN (CLEAN, WHITE, EDITORIAL)
+    # -----------------------------------------------------------------------------
     st.markdown(
         """
-        <div style="text-align:center; padding: 40px 20px 20px 20px;">
-            <span style="font-size:64px;">🥘</span>
-            <h1 class="brand-font" style="font-size:42px; color:#f59e0b; margin-top:10px;">
-                Pakistan's First AI Cooking Companion
+        <div style="text-align:center; padding: 24px 20px 24px 20px;">
+            <div style="display:inline-flex; width:60px; height:60px; border-radius:50%; background:#FFF7ED; align-items:center; justify-content:center; font-size:28px; margin-bottom:14px; border:1px solid #FFEDD5; box-shadow:0 4px 14px rgba(234, 88, 12, 0.08);">
+                🍲
+            </div>
+            <h1 style="font-size:42px; color:#0F172A; margin:0 0 10px 0;">
+                The Intelligent Cooking Companion
             </h1>
-            <p style="font-size:18px; color:#cbd5e1; max-width:650px; margin:0 auto 30px auto; line-height:1.6;">
-                Hands-free, step-by-step guidance through authentic South Asian recipes. 
-                Speaks your kitchen's language — <b>English, Urdu, and Roman Urdu</b>.
+            <p style="font-size:17px; color:#64748B; max-width:620px; margin:0 auto; line-height:1.6;">
+                Voice-first, step-by-step guidance for authentic Pakistani and South Asian cooking.
+                Speak naturally in <b style="color:#0F172A;">English, Urdu, or Roman Urdu</b>.
             </p>
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    col1, col2 = st.columns(2, gap="large")
-    with col1:
-        st.markdown(
-            """
-            <div class="chef-card">
-                <h3>🍗 Restaurant-Style Chicken Karahi</h3>
-                <p style="color:#94a3b8; font-size:0.9rem;">
-                    Rich, fiery karahi cooked on high flame with fresh tomatoes, green chillies, crushed black pepper, and julienned ginger.
-                </p>
-                <div style="display:flex; gap:10px; margin-top:10px;">
-                    <span class="badge-pill badge-pakistani">🇵🇰 Pakistani</span>
-                    <span class="badge-pill badge-step">⏱️ 45 Mins</span>
-                    <span class="badge-pill badge-active">4 Servings</span>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        if st.button("Cook Chicken Karahi Now ➔", use_container_width=True, type="primary"):
-            start_new_session(1, 4)
-            st.rerun()
+    c1, c2 = st.columns(2, gap="large")
 
-    with col2:
-        st.markdown(
-            """
-            <div class="chef-card">
-                <h3>🍲 Classic Tarka Daal</h3>
-                <p style="color:#94a3b8; font-size:0.9rem;">
-                    Hearty yellow moong and masoor lentils tempered with aromatic golden garlic, cumin seeds, and whole button red chillies in ghee.
-                </p>
-                <div style="display:flex; gap:10px; margin-top:10px;">
+    with c1:
+        with st.container(border=True):
+            st.markdown(
+                """
+                <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:14px;">
                     <span class="badge-pill badge-pakistani">🇵🇰 Pakistani</span>
-                    <span class="badge-pill badge-step">⏱️ 40 Mins</span>
-                    <span class="badge-pill badge-active">4 Servings</span>
+                    <span class="badge-pill badge-time">⏱️ 45 Mins</span>
                 </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        if st.button("Cook Tarka Daal Now ➔", use_container_width=True, type="primary"):
-            start_new_session(2, 4)
-            st.rerun()
+                <h3 style="font-size:24px; margin:0 0 10px 0; color:#0F172A;">Restaurant-Style Chicken Karahi</h3>
+                <p style="color:#475569; font-size:0.92rem; line-height:1.6; margin-bottom:18px;">
+                    Authentic Pakistani karahi cooked on high flame with fresh tomatoes, ginger-garlic, crushed black pepper, and fresh green chillies.
+                </p>
+                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px;">
+                    <span class="badge-pill badge-servings">👥 4 Servings</span>
+                    <span class="badge-pill" style="background:#F8FAFC; color:#334155; border:1px solid #E2E8F0;">📋 7 Steps</span>
+                    <span class="badge-pill" style="background:#FFF1F2; color:#E11D48; border:1px solid #FECDD3;">🌶️ Bhunai Style</span>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            if st.button("Cook Chicken Karahi ➔", key="start_karahi", use_container_width=True, type="primary"):
+                start_new_session(1, 4)
+                st.rerun()
+
+    with c2:
+        with st.container(border=True):
+            st.markdown(
+                """
+                <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:14px;">
+                    <span class="badge-pill badge-pakistani">🇵🇰 Pakistani</span>
+                    <span class="badge-pill badge-time">⏱️ 40 Mins</span>
+                </div>
+                <h3 style="font-size:24px; margin:0 0 10px 0; color:#0F172A;">Comforting Tarka Daal</h3>
+                <p style="color:#475569; font-size:0.92rem; line-height:1.6; margin-bottom:18px;">
+                    Slow-cooked yellow lentils tempered with golden garlic, cumin seeds, and whole dried button chillies in ghee.
+                </p>
+                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px;">
+                    <span class="badge-pill badge-servings">👥 4 Servings</span>
+                    <span class="badge-pill" style="background:#F8FAFC; color:#334155; border:1px solid #E2E8F0;">📋 7 Steps</span>
+                    <span class="badge-pill" style="background:#FEF3C7; color:#B45309; border:1px solid #FDE68A;">🧈 Golden Ghee Tarka</span>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            if st.button("Cook Tarka Daal ➔", key="start_daal", use_container_width=True, type="primary"):
+                start_new_session(2, 4)
+                st.rerun()
