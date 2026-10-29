@@ -45,7 +45,8 @@ class GeminiLLMProvider(BaseLLMProvider):
         self.model = model
         self.timeout = timeout
         self.max_retries = max_retries
-        self.client = genai.Client(api_key=api_key)
+        http_options = types.HttpOptions(timeout=float(timeout))
+        self.client = genai.Client(api_key=api_key, http_options=http_options)
 
     def _generate_content_resilient(self, contents: str, config: types.GenerateContentConfig):
         """Execute generate_content with automatic fallback for 404 deprecated models, 503 demand spikes, and 429 quota exhaustion."""
@@ -68,7 +69,7 @@ class GeminiLLMProvider(BaseLLMProvider):
                 )
             except (ServerError, ClientError) as e:
                 code = getattr(e, "code", None)
-                if code in (404, 429, 503):
+                if code in (404, 408, 429, 503, 504):
                     logger.warning(
                         "Gemini model '%s' hit %s (%s). Attempting fallback...",
                         candidate_model,

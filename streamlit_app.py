@@ -405,7 +405,7 @@ def start_new_session(recipe_id: int, servings_count: int):
         res = requests.post(
             f"{API_BASE_URL}/sessions",
             json={"recipe_id": recipe_id, "servings": servings_count},
-            timeout=8
+            timeout=60
         )
         if res.status_code == 201:
             data = res.json()
@@ -572,7 +572,7 @@ if st.session_state.session_id:
                     res = requests.post(
                         f"{API_BASE_URL}/sessions/{st.session_state.session_id}/message",
                         json={"message": user_input},
-                        timeout=30
+                        timeout=120
                     )
                     if res.status_code == 200:
                         data = res.json()
