@@ -48,9 +48,13 @@ class GeminiLLMProvider(BaseLLMProvider):
         self.client = genai.Client(api_key=api_key)
 
     def _generate_content_resilient(self, contents: str, config: types.GenerateContentConfig):
-        """Execute generate_content with automatic fallback for transient 503 demand spikes and 429 quota exhaustion."""
-        models = [self.model]
-        for fallback in ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite"):
+        """Execute generate_content with automatic fallback for 404 deprecated models, 503 demand spikes, and 429 quota exhaustion."""
+        primary = self.model
+        if primary in ("gemini-2.5-flash", "models/gemini-2.5-flash", "gemini-1.5-flash"):
+            primary = "gemini-3.8-flash"
+
+        models = [primary]
+        for fallback in ("gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"):
             if fallback not in models:
                 models.append(fallback)
 
@@ -64,7 +68,7 @@ class GeminiLLMProvider(BaseLLMProvider):
                 )
             except (ServerError, ClientError) as e:
                 code = getattr(e, "code", None)
-                if code in (429, 503):
+                if code in (404, 429, 503):
                     logger.warning(
                         "Gemini model '%s' hit %s (%s). Attempting fallback...",
                         candidate_model,

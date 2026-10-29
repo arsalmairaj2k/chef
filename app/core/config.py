@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     # LLM Settings
     llm_provider: str = "gemini"  # 'fake', 'gemini', or 'openai'
-    llm_model: str = "gemini-2.5-flash"
+    llm_model: str = "gemini-3.8-flash"
     gemini_api_key: str | None = None
     openai_api_key: str | None = None
     llm_timeout_seconds: float = 30.0
