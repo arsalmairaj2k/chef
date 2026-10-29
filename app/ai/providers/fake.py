@@ -74,6 +74,15 @@ class FakeLLMProvider(BaseLLMProvider):
         # Rule-based heuristic decision engine for realistic offline testing
         msg_lower = user_message.strip().lower()
 
+        # 0. Off-topic, code generation, and prompt injection defense
+        off_topic_patterns = ["python", "code", "script", "system prompt", "developer mode", "ignore previous", "hack", "write a program", "fibonacci"]
+        if any(pat in msg_lower for pat in off_topic_patterns):
+            return AnswerQuestionDecision(
+                type="answer_question",
+                question=user_message,
+                answer="Main sirf aapka Chef Companion hoon aur Pakistani/Desi cooking mein madad kar sakta hoon. Code likhna ya gher-mutaliqa sawalat mere domain se bahar hain. Chalein, recipe par wapas aatay hain!",
+            )
+
         # 1. Ambiguous statements trigger clarification
         ambiguous_patterns = ["chicken daal diya", "added onions", "done with something", "maybe"]
         if any(pat in msg_lower for pat in ambiguous_patterns):
