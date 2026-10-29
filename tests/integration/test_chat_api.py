@@ -288,3 +288,59 @@ def test_chat_refuses_system_prompt_leakage(client: TestClient, test_session_id:
     assert data["action"] is None
     assert data["session"]["current_step_number"] == 1
 
+
+# --- 10. Chat Message Transcript Retrieval & Persistence ---
+
+def test_get_session_messages_initially_empty(client: TestClient, test_session_id: int):
+    """A fresh session has no persisted messages initially."""
+    resp = client.get(f"/api/v1/sessions/{test_session_id}/messages")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_get_session_messages_chronological(client: TestClient, test_session_id: int):
+    """User and assistant messages are stored and retrieved in exact chronological order."""
+    # Turn 1
+    resp1 = client.post(
+        f"/api/v1/sessions/{test_session_id}/message",
+        json={"message": "What spices do I need for this step?"},
+    )
+    assert resp1.status_code == 200
+    data1 = resp1.json()
+
+    # Turn 2
+    resp2 = client.post(
+        f"/api/v1/sessions/{test_session_id}/message",
+        json={"message": "Finished step 1."},
+    )
+    assert resp2.status_code == 200
+    data2 = resp2.json()
+
+    # Fetch transcript
+    resp = client.get(f"/api/v1/sessions/{test_session_id}/messages")
+    assert resp.status_code == 200
+    msgs = resp.json()
+
+    assert len(msgs) == 4
+    assert msgs[0]["role"] == "user"
+    assert msgs[0]["content"] == "What spices do I need for this step?"
+    assert msgs[0]["session_id"] == test_session_id
+
+    assert msgs[1]["role"] == "assistant"
+    assert msgs[1]["content"] == data1["reply"]
+    assert msgs[1]["decision_type"] == data1["decision_type"]
+
+    assert msgs[2]["role"] == "user"
+    assert msgs[2]["content"] == "Finished step 1."
+
+    assert msgs[3]["role"] == "assistant"
+    assert msgs[3]["content"] == data2["reply"]
+    assert msgs[3]["decision_type"] == data2["decision_type"]
+
+
+def test_get_session_messages_not_found(client: TestClient):
+    """Querying transcript for non-existent session returns 404."""
+    resp = client.get("/api/v1/sessions/999999/messages")
+    assert resp.status_code == 404
+
+

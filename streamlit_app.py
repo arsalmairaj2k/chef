@@ -335,6 +335,8 @@ if "est_duration" not in st.session_state:
     st.session_state.est_duration = None
 if "pending_quick_message" not in st.session_state:
     st.session_state.pending_quick_message = None
+if "servings" not in st.session_state:
+    st.session_state.servings = 4
 
 # -----------------------------------------------------------------------------
 # SIDEBAR / NAVIGATION
@@ -417,6 +419,7 @@ def start_new_session(recipe_id: int, servings_count: int):
             st.session_state.total_steps = len(steps) if steps else 1
             st.session_state.steps_list = steps
             st.session_state.ingredients = data.get("ingredients", [])
+            st.session_state.servings = servings_count
 
             curr = data.get("current_step")
             if curr:
@@ -425,6 +428,9 @@ def start_new_session(recipe_id: int, servings_count: int):
             else:
                 st.session_state.current_instruction = ""
                 st.session_state.est_duration = None
+
+            # Persist session to URL query parameter for browser refresh recovery
+            st.query_params["session_id"] = str(data["id"])
 
             st.session_state.chat_history = [
                 {
@@ -439,27 +445,148 @@ def start_new_session(recipe_id: int, servings_count: int):
     except Exception as e:
         st.sidebar.error(f"Request failed: {e}")
 
-st.sidebar.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
-st.sidebar.markdown("<h4 style='font-size:14px; text-transform:uppercase; letter-spacing:0.06em; color:#64748B;'>Select Recipe</h4>", unsafe_allow_html=True)
+def load_session(session_id: int) -> bool:
+    """Restore an active session and full chat history on page refresh."""
+    try:
+        res = requests.get(f"{API_BASE_URL}/sessions/{session_id}", timeout=25)
+        if res.status_code == 200:
+            data = res.json()
+            steps = data.get("steps", [])
+            st.session_state.session_id = data["id"]
+            st.session_state.recipe_name = data["recipe_name"]
+            st.session_state.session_status = data["status"]
+            st.session_state.current_step_number = data.get("current_step_number", 1)
+            st.session_state.total_steps = len(steps) if steps else 1
+            st.session_state.steps_list = steps
+            st.session_state.ingredients = data.get("ingredients", [])
+            st.session_state.servings = data.get("servings", 4)
 
-recipes = fetch_recipes()
-recipe_map = {f"{r['name']} ({r['cuisine']})": r for r in recipes}
+            curr = data.get("current_step")
+            if curr:
+                st.session_state.current_instruction = curr.get("instruction", "")
+                st.session_state.est_duration = curr.get("estimated_duration_seconds")
+            elif data.get("status") == "COMPLETED":
+                st.session_state.current_instruction = "🎉 Recipe Completed! Nosh-e-Jaan / Enjoy your meal!"
+                st.session_state.est_duration = None
+            else:
+                st.session_state.current_instruction = ""
+                st.session_state.est_duration = None
 
-if recipe_map:
-    selected_name = st.sidebar.selectbox("Recipe", list(recipe_map.keys()), label_visibility="collapsed")
-    selected_recipe = recipe_map[selected_name]
+            st.query_params["session_id"] = str(data["id"])
 
-    c_serv, c_time = st.sidebar.columns(2)
-    with c_serv:
-        servings = st.number_input("Servings", min_value=1, max_value=20, value=selected_recipe.get("default_servings", 4))
-    with c_time:
-        tot_time = (selected_recipe.get("prep_time_minutes") or 0) + (selected_recipe.get("cook_time_minutes") or 0)
-        st.metric("Total Time", f"{tot_time}m")
+            # Retrieve persisted conversation messages from backend
+            try:
+                msg_res = requests.get(f"{API_BASE_URL}/sessions/{session_id}/messages", timeout=25)
+                if msg_res.status_code == 200:
+                    saved = msg_res.json()
+                    if saved:
+                        st.session_state.chat_history = [
+                            {
+                                "role": m["role"],
+                                "content": m["content"],
+                                "decision": m.get("decision_type"),
+                            }
+                            for m in saved
+                        ]
+                    else:
+                        st.session_state.chat_history = [
+                            {
+                                "role": "assistant",
+                                "content": f"**Assalam-o-Alaikum!** Resumed cooking session for **{data['recipe_name']}** ({st.session_state.servings} servings).\n\nLet's continue from **Step {st.session_state.current_step_number}**. Feel free to talk to me naturally in **English, Urdu, or Roman Urdu**!",
+                                "decision": "session_start",
+                            }
+                        ]
+            except Exception:
+                pass
+            return True
+        else:
+            if "session_id" in st.query_params:
+                del st.query_params["session_id"]
+            return False
+    except Exception as e:
+        if "session_id" in st.query_params:
+            del st.query_params["session_id"]
+        return False
 
-    if st.sidebar.button("Start Cooking Session", use_container_width=True, type="primary"):
-        start_new_session(selected_recipe["id"], servings)
+# -----------------------------------------------------------------------------
+# AUTO-RESTORE SESSION FROM URL QUERY PARAMETERS ON PAGE RELOAD / REFRESH
+# -----------------------------------------------------------------------------
+if st.session_state.session_id is None and "session_id" in st.query_params:
+    try:
+        raw_sid = st.query_params["session_id"]
+        if raw_sid:
+            load_session(int(raw_sid))
+    except (ValueError, TypeError):
+        if "session_id" in st.query_params:
+            del st.query_params["session_id"]
+
+# -----------------------------------------------------------------------------
+# SIDEBAR CONTROLS & RECIPE SELECTION
+# -----------------------------------------------------------------------------
+if st.session_state.session_id:
+    st.sidebar.markdown(
+        f"""
+        <div style="background:#FFF7ED; border:1px solid #FFEDD5; border-radius:14px; padding:14px 16px; margin-top:14px; margin-bottom:12px;">
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#C2410C; font-weight:700;">Active Cooking Session</div>
+            <div style="font-size:15px; font-weight:700; color:#0F172A; margin-top:3px;">#{st.session_state.session_id} — {st.session_state.recipe_name}</div>
+            <div style="font-size:12px; color:#64748B; margin-top:2px;">Step {st.session_state.current_step_number} of {st.session_state.total_steps} ({st.session_state.session_status})</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    if st.sidebar.button("🔄 Choose Another Recipe", use_container_width=True, type="secondary"):
+        st.session_state.session_id = None
+        st.session_state.recipe_name = None
+        st.session_state.chat_history = []
+        st.session_state.current_step_number = 1
+        st.session_state.total_steps = 1
+        st.session_state.steps_list = []
+        st.session_state.ingredients = []
+        st.session_state.current_instruction = ""
+        st.session_state.session_status = None
+        st.session_state.est_duration = None
+        if "session_id" in st.query_params:
+            del st.query_params["session_id"]
+        st.rerun()
+
+    with st.sidebar.expander("Switch Recipe"):
+        recipes = fetch_recipes()
+        recipe_map = {f"{r['name']} ({r['cuisine']})": r for r in recipes}
+        if recipe_map:
+            switch_name = st.selectbox("Recipe", list(recipe_map.keys()), key="sidebar_switch_recipe")
+            switch_recipe = recipe_map[switch_name]
+            c_serv, c_time = st.columns(2)
+            with c_serv:
+                switch_servings = st.number_input("Servings", min_value=1, max_value=20, value=switch_recipe.get("default_servings", 4), key="sidebar_switch_servings")
+            with c_time:
+                tot_time = (switch_recipe.get("prep_time_minutes") or 0) + (switch_recipe.get("cook_time_minutes") or 0)
+                st.metric("Total Time", f"{tot_time}m")
+            if st.button("Start New Session", use_container_width=True, type="primary", key="btn_start_switch"):
+                start_new_session(switch_recipe["id"], switch_servings)
+                st.rerun()
 else:
-    st.sidebar.info("No recipes loaded. Verify database seed.")
+    st.sidebar.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+    st.sidebar.markdown("<h4 style='font-size:14px; text-transform:uppercase; letter-spacing:0.06em; color:#64748B;'>Select Recipe</h4>", unsafe_allow_html=True)
+
+    recipes = fetch_recipes()
+    recipe_map = {f"{r['name']} ({r['cuisine']})": r for r in recipes}
+
+    if recipe_map:
+        selected_name = st.sidebar.selectbox("Recipe", list(recipe_map.keys()), label_visibility="collapsed")
+        selected_recipe = recipe_map[selected_name]
+
+        c_serv, c_time = st.sidebar.columns(2)
+        with c_serv:
+            servings = st.sidebar.number_input("Servings", min_value=1, max_value=20, value=selected_recipe.get("default_servings", 4))
+        with c_time:
+            tot_time = (selected_recipe.get("prep_time_minutes") or 0) + (selected_recipe.get("cook_time_minutes") or 0)
+            st.sidebar.metric("Total Time", f"{tot_time}m")
+
+        if st.sidebar.button("Start Cooking Session", use_container_width=True, type="primary"):
+            start_new_session(selected_recipe["id"], servings)
+            st.rerun()
+    else:
+        st.sidebar.info("No recipes loaded. Verify database seed.")
 
 st.sidebar.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
 with st.sidebar.expander("💬 Natural Speech Examples"):
@@ -616,7 +743,7 @@ if st.session_state.session_id:
 
         with tab_ing:
             st.markdown("<h4 style='font-size:16px; margin-top:8px;'>Ingredients Needed</h4>", unsafe_allow_html=True)
-            st.caption(f"Exact quantities scaled for **{servings} servings**:")
+            st.caption(f"Exact quantities scaled for **{st.session_state.get('servings', 4)} servings**:")
             if st.session_state.ingredients:
                 for idx, ing in enumerate(st.session_state.ingredients):
                     qty = f"**{ing['quantity']} {ing['unit'] or ''}**".strip() if ing.get("quantity") else "*To taste*"

@@ -36,3 +36,16 @@ class ChatMessageResponse(BaseModel):
     action: Optional[ActionExecutionSummary] = Field(None, description="Details of executed action if applicable")
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ChatMessageRead(BaseModel):
+    """Persisted conversation record."""
+    id: int
+    session_id: int
+    role: str
+    content: str
+    decision_type: Optional[str] = None
+    created_at: Any
+
+    model_config = ConfigDict(from_attributes=True)
+

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, status
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
-from app.schemas.chat import ChatMessageRequest, ChatMessageResponse
+from app.schemas.chat import ChatMessageRequest, ChatMessageResponse, ChatMessageRead
 from app.services.chat_service import ChatService
 from app.services.session_service import SessionNotFoundError
 from app.ai.providers.base import (
@@ -70,4 +70,24 @@ def send_session_message(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal LLM processing error: {e.message}",
+        )
+
+
+@router.get(
+    "/{session_id}/messages",
+    response_model=list[ChatMessageRead],
+    status_code=status.HTTP_200_OK,
+    summary="Get chronological conversation transcript for a cooking session",
+)
+def get_session_messages(
+    session_id: int = Path(..., gt=0, description="Active cooking session ID"),
+    db: Session = Depends(get_db),
+) -> list[ChatMessageRead]:
+    """Returns all user messages and assistant responses persisted for this session."""
+    try:
+        return ChatService.get_session_messages(db=db, session_id=session_id)
+    except SessionNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
         )

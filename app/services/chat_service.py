@@ -17,7 +17,8 @@ from app.ai.providers.base import (
     LLMProviderUnavailableError,
 )
 from app.services.session_service import SessionService, SessionNotFoundError
-from app.schemas.chat import ChatMessageResponse, ActionExecutionSummary
+from app.models.chat_message import ChatMessage
+from app.schemas.chat import ChatMessageResponse, ActionExecutionSummary, ChatMessageRead
 from app.schemas.cooking_session import CookingSessionRead
 
 
@@ -166,7 +167,7 @@ class ChatService:
                 data=action_result.data if action_result.success else None,
             )
 
-            return ChatMessageResponse(
+            response_obj = ChatMessageResponse(
                 reply=reply,
                 session=updated_session,
                 decision_type="execute_action",
@@ -176,7 +177,7 @@ class ChatService:
         elif decision.type == "answer_question":
             # Direct response from decision without redundant second roundtrip
             reply = decision.answer if getattr(decision, "answer", None) else "Here is the guidance for your recipe."
-            return ChatMessageResponse(
+            response_obj = ChatMessageResponse(
                 reply=reply,
                 session=session_read,
                 decision_type="answer_question",
@@ -186,7 +187,7 @@ class ChatService:
         elif decision.type == "clarify":
             # Direct response from decision without redundant second roundtrip
             reply = decision.question if getattr(decision, "question", None) else "Could you please clarify what you would like to do?"
-            return ChatMessageResponse(
+            response_obj = ChatMessageResponse(
                 reply=reply,
                 session=session_read,
                 decision_type="clarify",
@@ -195,3 +196,36 @@ class ChatService:
 
         else:
             raise ValueError(f"Unhandled decision type '{getattr(decision, 'type', None)}'")
+
+        # Persist conversation exchange to database for page refresh & history recovery
+        try:
+            user_msg_record = ChatMessage(session_id=session_id, role="user", content=cleaned_msg)
+            assistant_msg_record = ChatMessage(
+                session_id=session_id,
+                role="assistant",
+                content=response_obj.reply,
+                decision_type=response_obj.decision_type,
+            )
+            db.add(user_msg_record)
+            db.add(assistant_msg_record)
+            db.commit()
+        except Exception as e:
+            logger.warning("Could not persist chat message to database: %s", e)
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
+        return response_obj
+
+    @classmethod
+    def get_session_messages(cls, db: Session, session_id: int) -> list[ChatMessageRead]:
+        """Retrieve full chronological conversation transcript for an authoritative session."""
+        SessionService.get_session(db, session_id=session_id)
+        records = (
+            db.query(ChatMessage)
+            .filter(ChatMessage.session_id == session_id)
+            .order_by(ChatMessage.created_at.asc(), ChatMessage.id.asc())
+            .all()
+        )
+        return [ChatMessageRead.model_validate(r) for r in records]
