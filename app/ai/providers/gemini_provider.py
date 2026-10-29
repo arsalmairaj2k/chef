@@ -214,7 +214,8 @@ Respond strictly with a JSON object representing your decision. It MUST match on
             system_instruction=system_prompt,
             response_mime_type="application/json",
             temperature=0.0,
-            max_output_tokens=600,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            max_output_tokens=1000,
         )
 
         raw_content = ""
@@ -341,7 +342,8 @@ Provide a concise, direct, grounded response to the cook in their language."""
         config = types.GenerateContentConfig(
             system_instruction=system_prompt,
             temperature=0.3,
-            max_output_tokens=300,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            max_output_tokens=1500,
         )
 
         try:

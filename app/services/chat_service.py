@@ -117,31 +117,47 @@ class ChatService:
             # Refresh persisted session state after mutation
             updated_session = SessionService.get_session(db, session_id=session_id)
 
-            # Generate grounded response based on execution result with fail-safe fallback
-            try:
-                reply = llm.generate_grounded_response(
-                    system_prompt=GROUNDED_RESPONSE_PROMPT,
-                    user_message=cleaned_msg,
-                    decision=decision,
-                    action_result=action_result,
-                    session_state=updated_session,
-                )
-            except Exception as e:
-                logger.warning(
-                    "Grounded response generation failed after action '%s': %s. Providing authoritative session reply.",
-                    decision.action,
-                    e,
-                )
-                if not action_result.success:
-                    err_msg = action_result.error.message if action_result.error else "Action could not be executed."
-                    reply = f"Could not complete action: {err_msg}"
-                elif updated_session.status == "COMPLETED":
-                    reply = "🎉 Bohat khoob! Recipe mukammal ho chuki hai. Nosh-e-Jaan / Enjoy your meal!"
+            # Format authoritative grounded response directly from session state (0s latency, zero truncation risk)
+            if not action_result.success:
+                err_msg = action_result.error.message if action_result.error else "Unknown error"
+                reply = f"Action could not be completed: {err_msg}"
+            elif decision.action == "complete_step":
+                if updated_session.status == "COMPLETED":
+                    reply = "🎉 Bohat khoob! All cooking steps completed! Nosh-e-Jaan / Enjoy your meal!"
                 elif updated_session.current_step:
                     curr = updated_session.current_step
-                    reply = f"Step {curr.step_number}: {curr.instruction}"
+                    reply = f"✅ Step marked completed! Next up: Step {curr.step_number} - {curr.instruction}"
                 else:
-                    reply = "Action completed successfully."
+                    reply = "Step marked completed!"
+            elif decision.action == "skip_step":
+                if updated_session.status == "COMPLETED":
+                    reply = "⏭️ Step skipped. All cooking steps are now finished."
+                elif updated_session.current_step:
+                    curr = updated_session.current_step
+                    reply = f"⏭️ Step skipped. Proceed to Step {curr.step_number} - {curr.instruction}"
+                else:
+                    reply = "Step skipped."
+            elif decision.action in ("get_current_step", "get_current_state"):
+                if updated_session.current_step:
+                    curr = updated_session.current_step
+                    reply = f"Currently on Step {curr.step_number}: {curr.instruction}"
+                else:
+                    reply = f"Session status: {updated_session.status}"
+            else:
+                try:
+                    reply = llm.generate_grounded_response(
+                        system_prompt=GROUNDED_RESPONSE_PROMPT,
+                        user_message=cleaned_msg,
+                        decision=decision,
+                        action_result=action_result,
+                        session_state=updated_session,
+                    )
+                except Exception as e:
+                    logger.warning("Grounded fallback after action: %s", e)
+                    if updated_session.current_step:
+                        reply = f"Step {updated_session.current_step_number}: {updated_session.current_step.instruction}"
+                    else:
+                        reply = "Action completed successfully."
 
             action_summary = ActionExecutionSummary(
                 name=decision.action,
