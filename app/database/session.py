@@ -6,6 +6,10 @@ from app.core.config import get_settings
 
 def create_db_engine(database_url: str):
     """Create SQLAlchemy engine with appropriate dialect settings."""
+    # Fix Render/Heroku Postgres URL prefix if provided
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+
     connect_args = {}
     if database_url.startswith("sqlite"):
         connect_args["check_same_thread"] = False

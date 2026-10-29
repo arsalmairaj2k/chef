@@ -11,12 +11,12 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8000
 
-    # Database settings
-    database_url: str = "postgresql://chef_user:chef_password@127.0.0.1:5432/chef_db"
+    # Database settings: Default to SQLite for zero-config deployment
+    database_url: str = "sqlite:///chef.db"
 
     # LLM Settings
-    llm_provider: str = "fake"  # 'fake', 'gemini', or 'openai'
-    llm_model: str = "gemini-3.8-flash"
+    llm_provider: str = "gemini"  # 'fake', 'gemini', or 'openai'
+    llm_model: str = "gemini-2.5-flash"
     gemini_api_key: str | None = None
     openai_api_key: str | None = None
     llm_timeout_seconds: float = 30.0
