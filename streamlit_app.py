@@ -362,11 +362,18 @@ if "API_BASE_URL" in os.environ:
 elif hasattr(st, "secrets") and "API_BASE_URL" in st.secrets:
     default_api_url = st.secrets["API_BASE_URL"]
 
-API_BASE_URL = st.sidebar.text_input(
+API_HOST_INPUT = st.sidebar.text_input(
     "API Host",
     value=default_api_url,
-    help="FastAPI backend endpoint (e.g. https://chef-api.onrender.com/api/v1)"
+    help="FastAPI backend endpoint (e.g. https://chef-backend-1c8v.onrender.com/api/v1)"
 )
+
+# Normalize URL: strip whitespace and trailing slashes
+raw_host = API_HOST_INPUT.strip().rstrip("/")
+if not raw_host.endswith("/api/v1"):
+    API_BASE_URL = f"{raw_host}/api/v1"
+else:
+    API_BASE_URL = raw_host
 
 def check_health():
     try:

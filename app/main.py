@@ -55,16 +55,20 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(health_router, prefix=settings.api_v1_prefix)
 
-    # Recipes API under /api/v1/recipes
+    # Recipes API under /api/v1/recipes and /recipes
+    app.include_router(recipes_router)
     app.include_router(recipes_router, prefix=settings.api_v1_prefix)
 
-    # Sessions API under /api/v1/sessions
+    # Sessions API under /api/v1/sessions and /sessions
+    app.include_router(sessions_router)
     app.include_router(sessions_router, prefix=settings.api_v1_prefix)
 
-    # Actions API under /api/v1/sessions
+    # Actions API under /api/v1/sessions and /sessions
+    app.include_router(actions_router)
     app.include_router(actions_router, prefix=settings.api_v1_prefix)
 
-    # Chat Interaction API under /api/v1/sessions
+    # Chat Interaction API under /api/v1/sessions and /sessions
+    app.include_router(chat_router)
     app.include_router(chat_router, prefix=settings.api_v1_prefix)
 
     @app.get("/", tags=["root"])
