@@ -45,11 +45,13 @@ class GeminiLLMProvider(BaseLLMProvider):
         self.model = model
         self.timeout = timeout
         self.max_retries = max_retries
-        http_options = types.HttpOptions(timeout=float(timeout))
+        # google-genai HttpOptions timeout is in milliseconds
+        timeout_ms = int(timeout * 1000) if timeout < 1000 else int(timeout)
+        http_options = types.HttpOptions(timeout=timeout_ms)
         self.client = genai.Client(api_key=api_key, http_options=http_options)
 
     def _generate_content_resilient(self, contents: str, config: types.GenerateContentConfig):
-        """Execute generate_content with automatic fallback for 404 deprecated models, 503 demand spikes, and 429 quota exhaustion."""
+        """Execute generate_content with automatic fallback for 404 deprecated models, 503 demand spikes, timeouts, and 429 quota exhaustion."""
         primary = self.model
         if primary in ("gemini-2.5-flash", "models/gemini-2.5-flash", "gemini-1.5-flash"):
             primary = "gemini-3.8-flash"
@@ -80,6 +82,15 @@ class GeminiLLMProvider(BaseLLMProvider):
                     continue
                 raise
             except Exception as e:
+                err_str = str(e).lower()
+                if "timed out" in err_str or "timeout" in err_str:
+                    logger.warning(
+                        "Gemini model '%s' timed out (%s). Attempting fallback...",
+                        candidate_model,
+                        e,
+                    )
+                    last_error = e
+                    continue
                 last_error = e
                 raise
 
@@ -160,6 +171,9 @@ Respond strictly with a JSON object representing your decision. It MUST match on
         except TimeoutError as e:
             raise LLMTimeoutError(f"Gemini request timed out: {e}") from e
         except Exception as e:
+            err_str = str(e).lower()
+            if "timed out" in err_str or "timeout" in err_str:
+                raise LLMTimeoutError(f"Gemini request timed out: {e}") from e
             raise LLMError(f"Unexpected error communicating with Gemini: {e}") from e
 
     def generate_grounded_response(
@@ -215,5 +229,8 @@ Provide a concise, direct, grounded response to the cook in their language."""
         except TimeoutError as e:
             raise LLMTimeoutError(f"Gemini response timed out: {e}") from e
         except Exception as e:
+            err_str = str(e).lower()
+            if "timed out" in err_str or "timeout" in err_str:
+                raise LLMTimeoutError(f"Gemini response timed out: {e}") from e
             raise LLMError(f"Unexpected error communicating with Gemini: {e}") from e
 
