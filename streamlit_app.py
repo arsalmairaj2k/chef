@@ -377,7 +377,7 @@ else:
 
 def check_health():
     try:
-        r = requests.get(f"{API_BASE_URL}/health", timeout=2)
+        r = requests.get(f"{API_BASE_URL}/health", timeout=10)
         if r.status_code == 200:
             return True, r.json().get("version", "0.1.0")
     except Exception:
@@ -393,7 +393,7 @@ else:
 
 def fetch_recipes():
     try:
-        res = requests.get(f"{API_BASE_URL}/recipes", timeout=5)
+        res = requests.get(f"{API_BASE_URL}/recipes", timeout=25)
         if res.status_code == 200:
             return res.json().get("items", [])
     except Exception:
@@ -597,9 +597,19 @@ if st.session_state.session_id:
                         })
                         st.rerun()
                     else:
-                        st.error(f"Backend Error ({res.status_code}): {res.text}")
+                        st.session_state.chat_history.append({
+                            "role": "assistant",
+                            "content": f"⚠️ **Server Notice ({res.status_code}):** {res.text}\n\n*Please try sending your message again.*",
+                            "decision": "clarify"
+                        })
+                        st.rerun()
                 except Exception as e:
-                    st.error(f"Connection failed: {e}")
+                    st.session_state.chat_history.append({
+                        "role": "assistant",
+                        "content": f"⚠️ **Connection Notice:** Unable to reach backend ({e}). If the server was sleeping, it is waking up. Please retry in a few moments.",
+                        "decision": "clarify"
+                    })
+                    st.rerun()
 
     with right_col:
         tab_ing, tab_map, tab_tips = st.tabs(["🧂 Ingredients", "📋 Roadmap", "💡 Tips"])

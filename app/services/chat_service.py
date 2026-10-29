@@ -80,12 +80,32 @@ class ChatService:
 
         # 6. Dispatch based on decision outcome
         if decision.type == "execute_action":
-            exec_args = dict(decision.arguments)
+            raw_args = dict(decision.arguments)
+            exec_args: dict = {}
 
             # Inbound session actions must target this authoritative session
             session_actions = {"get_current_state", "get_current_step", "complete_step", "skip_step"}
             if decision.action in session_actions:
                 exec_args["session_id"] = session_id
+
+            if decision.action in ("complete_step", "skip_step"):
+                step_num = raw_args.get("step_number")
+                if step_num is None:
+                    exec_args["step_number"] = session_read.current_step_number
+                else:
+                    try:
+                        exec_args["step_number"] = int(step_num)
+                    except (ValueError, TypeError):
+                        exec_args["step_number"] = session_read.current_step_number
+            elif decision.action == "get_recipe":
+                if "recipe_id" in raw_args and raw_args["recipe_id"] is not None:
+                    exec_args["recipe_id"] = int(raw_args["recipe_id"])
+                elif "slug" in raw_args and raw_args["slug"]:
+                    exec_args["slug"] = str(raw_args["slug"]).strip()
+                else:
+                    exec_args["recipe_id"] = session_read.recipe_id
+            else:
+                exec_args.update(raw_args)
 
             # Execute action via existing, validated ActionExecutor
             action_result = ActionExecutor.execute_action(
@@ -97,14 +117,31 @@ class ChatService:
             # Refresh persisted session state after mutation
             updated_session = SessionService.get_session(db, session_id=session_id)
 
-            # Generate grounded response based on execution result
-            reply = llm.generate_grounded_response(
-                system_prompt=GROUNDED_RESPONSE_PROMPT,
-                user_message=cleaned_msg,
-                decision=decision,
-                action_result=action_result,
-                session_state=updated_session,
-            )
+            # Generate grounded response based on execution result with fail-safe fallback
+            try:
+                reply = llm.generate_grounded_response(
+                    system_prompt=GROUNDED_RESPONSE_PROMPT,
+                    user_message=cleaned_msg,
+                    decision=decision,
+                    action_result=action_result,
+                    session_state=updated_session,
+                )
+            except Exception as e:
+                logger.warning(
+                    "Grounded response generation failed after action '%s': %s. Providing authoritative session reply.",
+                    decision.action,
+                    e,
+                )
+                if not action_result.success:
+                    err_msg = action_result.error.message if action_result.error else "Action could not be executed."
+                    reply = f"Could not complete action: {err_msg}"
+                elif updated_session.status == "COMPLETED":
+                    reply = "🎉 Bohat khoob! Recipe mukammal ho chuki hai. Nosh-e-Jaan / Enjoy your meal!"
+                elif updated_session.current_step:
+                    curr = updated_session.current_step
+                    reply = f"Step {curr.step_number}: {curr.instruction}"
+                else:
+                    reply = "Action completed successfully."
 
             action_summary = ActionExecutionSummary(
                 name=decision.action,
@@ -121,13 +158,8 @@ class ChatService:
             )
 
         elif decision.type == "answer_question":
-            reply = llm.generate_grounded_response(
-                system_prompt=GROUNDED_RESPONSE_PROMPT,
-                user_message=cleaned_msg,
-                decision=decision,
-                action_result=None,
-                session_state=session_read,
-            )
+            # Direct response from decision without redundant second roundtrip
+            reply = decision.answer if getattr(decision, "answer", None) else "Here is the guidance for your recipe."
             return ChatMessageResponse(
                 reply=reply,
                 session=session_read,
@@ -136,13 +168,8 @@ class ChatService:
             )
 
         elif decision.type == "clarify":
-            reply = llm.generate_grounded_response(
-                system_prompt=GROUNDED_RESPONSE_PROMPT,
-                user_message=cleaned_msg,
-                decision=decision,
-                action_result=None,
-                session_state=session_read,
-            )
+            # Direct response from decision without redundant second roundtrip
+            reply = decision.question if getattr(decision, "question", None) else "Could you please clarify what you would like to do?"
             return ChatMessageResponse(
                 reply=reply,
                 session=session_read,
