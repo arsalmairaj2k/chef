@@ -131,7 +131,6 @@ Respond strictly with a JSON object representing your decision. It MUST match on
             response_mime_type="application/json",
             temperature=0.0,
             max_output_tokens=350,
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
         )
 
         try:
@@ -206,7 +205,6 @@ Provide a concise, direct, grounded response to the cook in their language."""
             system_instruction=system_prompt,
             temperature=0.3,
             max_output_tokens=250,
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
         )
 
         try:
