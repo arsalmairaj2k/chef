@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import requests
 
 # -----------------------------------------------------------------------------
@@ -337,6 +338,8 @@ if "pending_quick_message" not in st.session_state:
     st.session_state.pending_quick_message = None
 if "servings" not in st.session_state:
     st.session_state.servings = 4
+if "timer_auto_start" not in st.session_state:
+    st.session_state.timer_auto_start = False
 
 # -----------------------------------------------------------------------------
 # SIDEBAR / NAVIGATION
@@ -432,10 +435,18 @@ def start_new_session(recipe_id: int, servings_count: int):
             # Persist session to URL query parameter for browser refresh recovery
             st.query_params["session_id"] = str(data["id"])
 
+            step1_dur = curr.get("estimated_duration_seconds") if curr else None
+            timer_ask = ""
+            if step1_dur and step1_dur >= 60:
+                mins = round(step1_dur / 60)
+                timer_ask = f"\n\n⏱️ **Shall I start the timer for {mins} minutes?**"
+            elif step1_dur and step1_dur > 0:
+                timer_ask = f"\n\n⏱️ **Shall I start the timer for {step1_dur} seconds?**"
+
             st.session_state.chat_history = [
                 {
                     "role": "assistant",
-                    "content": f"**Assalam-o-Alaikum!** I'm your dedicated Chef companion for **{data['recipe_name']}** ({servings_count} servings).\n\nWhenever you're ready, let's begin with **Step 1**. Feel free to talk to me naturally in **English, Urdu, or Roman Urdu**!",
+                    "content": f"**Assalam-o-Alaikum!** I'm your dedicated Chef companion for **{data['recipe_name']}** ({servings_count} servings).\n\nWhenever you're ready, let's begin with **Step 1**: {st.session_state.current_instruction}{timer_ask}\n\n*(Feel free to talk to me naturally in English, Urdu, or Roman Urdu!)*",
                     "decision": "session_start"
                 }
             ]
@@ -649,9 +660,417 @@ if st.session_state.session_id:
             unsafe_allow_html=True
         )
 
+        # Step Cooking Timer Widget if step has estimated duration
+        if st.session_state.est_duration and st.session_state.est_duration > 0:
+            dur_sec = st.session_state.est_duration
+            dur_mins = round(dur_sec / 60) if dur_sec >= 60 else None
+            dur_label = f"{dur_mins} mins" if dur_mins else f"{dur_sec}s"
+
+            timer_component_html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <meta charset="utf-8">
+            <style>
+                * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+                body {{
+                    background: transparent;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                    color: #0F172A;
+                    padding: 2px 2px 8px 2px;
+                }}
+                .timer-card {{
+                    background: #FFFFFF;
+                    border: 1px solid #FED7AA;
+                    border-left: 6px solid #EA580C;
+                    border-radius: 16px;
+                    padding: 14px 18px;
+                    box-shadow: 0 4px 16px -2px rgba(234, 88, 12, 0.08);
+                    transition: all 0.25s ease;
+                }}
+                .timer-top {{
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 8px;
+                }}
+                .timer-title {{
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-weight: 700;
+                    font-size: 13px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.04em;
+                    color: #C2410C;
+                }}
+                .badge {{
+                    font-size: 11px;
+                    font-weight: 700;
+                    padding: 2px 9px;
+                    border-radius: 12px;
+                    background: #FFF7ED;
+                    color: #C2410C;
+                    border: 1px solid #FFEDD5;
+                }}
+                .btn-chime {{
+                    background: #FAFAFA;
+                    border: 1px solid #E2E8F0;
+                    border-radius: 8px;
+                    padding: 4px 10px;
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: #475569;
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                }}
+                .btn-chime:hover {{
+                    background: #FFF7ED;
+                    color: #EA580C;
+                    border-color: #FDBA74;
+                }}
+                .clock-row {{
+                    display: flex;
+                    align-items: baseline;
+                    justify-content: space-between;
+                    margin-bottom: 8px;
+                }}
+                .clock-digits {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;
+                    font-size: 32px;
+                    font-weight: 800;
+                    color: #0F172A;
+                    letter-spacing: -0.02em;
+                    line-height: 1;
+                }}
+                .timer-hint {{
+                    font-size: 12px;
+                    color: #64748B;
+                    font-weight: 500;
+                }}
+                .progress-track {{
+                    width: 100%;
+                    height: 6px;
+                    background: #F1F5F9;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    margin-bottom: 12px;
+                }}
+                .progress-fill {{
+                    width: 100%;
+                    height: 100%;
+                    background: linear-gradient(90deg, #EA580C 0%, #F59E0B 100%);
+                    border-radius: 8px;
+                    transition: width 0.3s ease;
+                }}
+                .btn-group {{
+                    display: flex;
+                    gap: 8px;
+                    align-items: center;
+                }}
+                .btn-primary {{
+                    background: linear-gradient(135deg, #EA580C 0%, #C2410C 100%);
+                    color: #FFFFFF;
+                    border: none;
+                    border-radius: 10px;
+                    padding: 7px 16px;
+                    font-weight: 700;
+                    font-size: 13px;
+                    cursor: pointer;
+                    box-shadow: 0 2px 8px rgba(234, 88, 12, 0.25);
+                    transition: all 0.15s ease;
+                }}
+                .btn-primary:hover {{
+                    background: linear-gradient(135deg, #C2410C 0%, #9A3412 100%);
+                    transform: translateY(-1px);
+                }}
+                .btn-secondary {{
+                    background: #FFFFFF;
+                    border: 1px solid #CBD5E1;
+                    color: #334155;
+                    border-radius: 10px;
+                    padding: 7px 13px;
+                    font-weight: 600;
+                    font-size: 13px;
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                }}
+                .btn-secondary:hover {{
+                    background: #F8FAFC;
+                    color: #0F172A;
+                    border-color: #94A3B8;
+                }}
+            </style>
+            </head>
+            <body>
+            <div id="timer-card" class="timer-card">
+                <div class="timer-top">
+                    <div class="timer-title">
+                        <span>⏱️ Step {st.session_state.current_step_number} Timer</span>
+                        <span id="timer-badge" class="badge">Ready</span>
+                    </div>
+                    <button id="btn-test-chime" class="btn-chime" title="Test fun bell alarm sound">🔔 Test Alarm Bell</button>
+                </div>
+                <div class="clock-row">
+                    <div id="clock-display" class="clock-digits">00:00</div>
+                    <div id="clock-hint" class="timer-hint">Recommended: {dur_label}</div>
+                </div>
+                <div class="progress-track">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+                <div class="btn-group">
+                    <button id="btn-start" class="btn-primary">▶️ Start {dur_label} Timer</button>
+                    <button id="btn-pause" class="btn-secondary" style="display: none;">⏸️ Pause</button>
+                    <button id="btn-reset" class="btn-secondary">🔄 Reset</button>
+                    <button id="btn-add-min" class="btn-secondary">+1 Min</button>
+                </div>
+            </div>
+
+            <script>
+            (function() {{
+                const sessionId = "{st.session_state.session_id}";
+                const stepNum = {st.session_state.current_step_number};
+                const totalDuration = {dur_sec};
+                const autoStart = {"true" if st.session_state.get("timer_auto_start", False) else "false"};
+                const storageKey = "chef_timer_" + sessionId + "_" + stepNum;
+
+                const clockEl = document.getElementById("clock-display");
+                const hintEl = document.getElementById("clock-hint");
+                const progressEl = document.getElementById("progress-fill");
+                const badgeEl = document.getElementById("timer-badge");
+                const cardEl = document.getElementById("timer-card");
+                const btnStart = document.getElementById("btn-start");
+                const btnPause = document.getElementById("btn-pause");
+                const btnReset = document.getElementById("btn-reset");
+                const btnAddMin = document.getElementById("btn-add-min");
+                const btnTestChime = document.getElementById("btn-test-chime");
+
+                // Fun Acoustic Bell Chime using Web Audio API (duration ~1.4 seconds)
+                function playFunBell() {{
+                    try {{
+                        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                        if (!AudioCtx) return;
+                        const ctx = new AudioCtx();
+                        const now = ctx.currentTime;
+
+                        // Tone 1 at t=0: Bright strike (880Hz + 1318.5Hz + 1760Hz)
+                        [880, 1318.5, 1760].forEach((freq, idx) => {{
+                            const osc = ctx.createOscillator();
+                            const gain = ctx.createGain();
+                            osc.type = idx === 0 ? "triangle" : "sine";
+                            osc.frequency.setValueAtTime(freq, now);
+                            gain.gain.setValueAtTime(idx === 0 ? 0.35 : 0.15, now);
+                            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+                            osc.connect(gain);
+                            gain.connect(ctx.destination);
+                            osc.start(now);
+                            osc.stop(now + 0.65);
+                        }});
+
+                        // Tone 2 at t=0.18s: Cheerful resolve chime (1174.66Hz + 1760Hz + 2349.32Hz)
+                        const t2 = now + 0.18;
+                        [1174.66, 1760, 2349.32].forEach((freq, idx) => {{
+                            const osc = ctx.createOscillator();
+                            const gain = ctx.createGain();
+                            osc.type = idx === 0 ? "triangle" : "sine";
+                            osc.frequency.setValueAtTime(freq, t2);
+                            gain.gain.setValueAtTime(idx === 0 ? 0.45 : 0.2, t2);
+                            gain.gain.exponentialRampToValueAtTime(0.0001, t2 + 1.2);
+                            osc.connect(gain);
+                            gain.connect(ctx.destination);
+                            osc.start(t2);
+                            osc.stop(t2 + 1.25);
+                        }});
+                    }} catch(e) {{
+                        console.error("Audio error:", e);
+                    }}
+                }}
+
+                btnTestChime.addEventListener("click", playFunBell);
+
+                let state = {{
+                    totalDuration: totalDuration,
+                    targetEndTime: null,
+                    isRunning: false,
+                    remainingSeconds: totalDuration,
+                    hasChimed: false
+                }};
+
+                try {{
+                    const raw = sessionStorage.getItem(storageKey);
+                    if (raw) {{
+                        const saved = JSON.parse(raw);
+                        if (saved && typeof saved.remainingSeconds === "number") {{
+                            state = saved;
+                        }}
+                    }}
+                }} catch(e) {{}}
+
+                function saveState() {{
+                    try {{
+                        sessionStorage.setItem(storageKey, JSON.stringify(state));
+                    }} catch(e) {{}}
+                }}
+
+                function formatTime(secs) {{
+                    secs = Math.max(0, Math.floor(secs));
+                    const m = Math.floor(secs / 60);
+                    const s = secs % 60;
+                    return (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
+                }}
+
+                let intervalId = null;
+
+                function updateUI() {{
+                    let remaining = state.remainingSeconds;
+                    if (state.isRunning && state.targetEndTime) {{
+                        const now = Date.now();
+                        remaining = Math.max(0, Math.round((state.targetEndTime - now) / 1000));
+                        state.remainingSeconds = remaining;
+                    }}
+
+                    clockEl.textContent = formatTime(remaining);
+                    const pct = state.totalDuration > 0 ? (remaining / state.totalDuration) * 100 : 0;
+                    progressEl.style.width = Math.max(0, Math.min(100, pct)) + "%";
+
+                    if (state.isRunning) {{
+                        btnStart.style.display = "none";
+                        btnPause.style.display = "inline-block";
+                        btnPause.textContent = "⏸️ Pause";
+                        badgeEl.textContent = "🔥 Running";
+                        badgeEl.style.background = "#FEF3C7";
+                        badgeEl.style.color = "#D97706";
+                        badgeEl.style.borderColor = "#FCD34D";
+                        hintEl.textContent = "Cooking in progress...";
+                        cardEl.style.borderLeftColor = "#EA580C";
+                        cardEl.style.background = "#FFFFFF";
+                    }} else if (remaining === 0) {{
+                        btnStart.style.display = "inline-block";
+                        btnStart.textContent = "🔄 Restart Timer";
+                        btnPause.style.display = "none";
+                        badgeEl.textContent = "🔔 Time's Up!";
+                        badgeEl.style.background = "#ECFDF5";
+                        badgeEl.style.color = "#047857";
+                        badgeEl.style.borderColor = "#A7F3D0";
+                        hintEl.textContent = "Time complete! Proceed when ready.";
+                        cardEl.style.borderLeftColor = "#10B981";
+                        cardEl.style.background = "#F0FDF4";
+                    }} else if (remaining < state.totalDuration) {{
+                        btnStart.style.display = "inline-block";
+                        btnStart.textContent = "▶️ Resume";
+                        btnPause.style.display = "none";
+                        badgeEl.textContent = "⏸️ Paused";
+                        badgeEl.style.background = "#F1F5F9";
+                        badgeEl.style.color = "#475569";
+                        badgeEl.style.borderColor = "#CBD5E1";
+                        hintEl.textContent = "Timer paused";
+                        cardEl.style.borderLeftColor = "#F59E0B";
+                        cardEl.style.background = "#FFFFFF";
+                    }} else {{
+                        btnStart.style.display = "inline-block";
+                        btnStart.textContent = "▶️ Start {dur_label} Timer";
+                        btnPause.style.display = "none";
+                        badgeEl.textContent = "Ready";
+                        badgeEl.style.background = "#FFF7ED";
+                        badgeEl.style.color = "#C2410C";
+                        badgeEl.style.borderColor = "#FFEDD5";
+                        hintEl.textContent = "Recommended: {dur_label}";
+                        cardEl.style.borderLeftColor = "#EA580C";
+                        cardEl.style.background = "#FFFFFF";
+                    }}
+                }}
+
+                function tick() {{
+                    if (!state.isRunning) return;
+                    const now = Date.now();
+                    const rem = Math.max(0, Math.round((state.targetEndTime - now) / 1000));
+                    state.remainingSeconds = rem;
+
+                    if (rem <= 0) {{
+                        state.isRunning = false;
+                        state.targetEndTime = null;
+                        if (intervalId) clearInterval(intervalId);
+                        intervalId = null;
+
+                        if (!state.hasChimed) {{
+                            state.hasChimed = true;
+                            playFunBell();
+                        }}
+                    }}
+                    saveState();
+                    updateUI();
+                }}
+
+                function startTimer() {{
+                    if (state.remainingSeconds <= 0) {{
+                        state.remainingSeconds = state.totalDuration;
+                    }}
+                    state.isRunning = true;
+                    state.hasChimed = false;
+                    state.targetEndTime = Date.now() + (state.remainingSeconds * 1000);
+                    saveState();
+                    updateUI();
+                    if (intervalId) clearInterval(intervalId);
+                    intervalId = setInterval(tick, 1000);
+                }}
+
+                function pauseTimer() {{
+                    if (!state.isRunning) return;
+                    state.isRunning = false;
+                    const now = Date.now();
+                    state.remainingSeconds = Math.max(0, Math.round((state.targetEndTime - now) / 1000));
+                    state.targetEndTime = null;
+                    if (intervalId) clearInterval(intervalId);
+                    intervalId = null;
+                    saveState();
+                    updateUI();
+                }}
+
+                function resetTimer() {{
+                    state.isRunning = false;
+                    state.targetEndTime = null;
+                    state.remainingSeconds = state.totalDuration;
+                    state.hasChimed = false;
+                    if (intervalId) clearInterval(intervalId);
+                    intervalId = null;
+                    saveState();
+                    updateUI();
+                }}
+
+                function addOneMin() {{
+                    state.remainingSeconds += 60;
+                    state.totalDuration += 60;
+                    if (state.isRunning && state.targetEndTime) {{
+                        state.targetEndTime += 60000;
+                    }}
+                    state.hasChimed = false;
+                    saveState();
+                    updateUI();
+                }}
+
+                btnStart.addEventListener("click", startTimer);
+                btnPause.addEventListener("click", pauseTimer);
+                btnReset.addEventListener("click", resetTimer);
+                btnAddMin.addEventListener("click", addOneMin);
+
+                if (autoStart && !state.isRunning && state.remainingSeconds > 0) {{
+                    startTimer();
+                }} else if (state.isRunning) {{
+                    intervalId = setInterval(tick, 1000);
+                }}
+
+                updateUI();
+            }})();
+            </script>
+            </body>
+            </html>
+            """
+            components.html(timer_component_html, height=180, scrolling=False)
+            st.session_state.timer_auto_start = False
+
         # Quick Action Shortcuts (Hands-Free simulation)
         st.caption("Quick actions:")
-        btn_c1, btn_c2, btn_c3, btn_c4 = st.columns(4)
+        btn_c1, btn_c2, btn_c3, btn_c4, btn_c5 = st.columns([1, 1, 1, 1, 1.1])
         if btn_c1.button("✅ Done", use_container_width=True, type="secondary"):
             st.session_state.pending_quick_message = f"Step {st.session_state.current_step_number} complete, aage kya karna hai?"
             st.rerun()
@@ -663,6 +1082,10 @@ if st.session_state.session_id:
             st.rerun()
         if btn_c4.button("⏭️ Skip", use_container_width=True, type="secondary"):
             st.session_state.pending_quick_message = "Skip this step."
+            st.rerun()
+        if btn_c5.button("⏱️ Timer", use_container_width=True, type="secondary"):
+            st.session_state.timer_auto_start = True
+            st.session_state.pending_quick_message = "Start the timer for this step."
             st.rerun()
 
         st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
@@ -690,6 +1113,12 @@ if st.session_state.session_id:
             st.session_state.pending_quick_message = None
 
         if user_input:
+            # Check if user affirms or requests timer start
+            low_in = user_input.strip().lower()
+            affirmations = ["yes", "start timer", "start", "haan", "haan timer shuru kardo", "haan shuru kardo", "sure", "yes please", "ji", "ok start timer", "start the timer"]
+            if any(low_in == a or low_in.startswith(a) for a in affirmations):
+                st.session_state.timer_auto_start = True
+
             st.session_state.chat_history.append({"role": "user", "content": user_input})
             with st.chat_message("user", avatar="👤"):
                 st.markdown(user_input)

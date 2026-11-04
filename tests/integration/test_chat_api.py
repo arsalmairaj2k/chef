@@ -344,3 +344,26 @@ def test_get_session_messages_not_found(client: TestClient):
     assert resp.status_code == 404
 
 
+def test_chat_proactive_timer_flow(client: TestClient, test_session_id: int):
+    """Advancing to a timed step asks proactive timer question, and user can confirm timer start."""
+    # Complete step 1 -> step 2 has 900 seconds (15 mins)
+    resp = client.post(
+        f"/api/v1/sessions/{test_session_id}/message",
+        json={"message": "Step 1 is done."},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "Shall I start the timer for 15 minutes?" in data["reply"]
+
+    # User confirms timer
+    confirm_resp = client.post(
+        f"/api/v1/sessions/{test_session_id}/message",
+        json={"message": "Yes, start timer."},
+    )
+    assert confirm_resp.status_code == 200
+    confirm_data = confirm_resp.json()
+    assert "Timer started" in confirm_data["reply"]
+    assert "bell" in confirm_data["reply"].lower()
+
+
+

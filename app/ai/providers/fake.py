@@ -91,7 +91,19 @@ class FakeLLMProvider(BaseLLMProvider):
                 question="Did you just add the ingredient to the pan, or has this cooking step finished completely?",
             )
 
-        # 2. General culinary questions (distinguished from step completions)
+        # 2. Timer requests and affirmations
+        timer_patterns = ["start timer", "timer shuru", "timer laga", "haan shuru", "yes start", "haan timer", "start the timer"]
+        if any(pat in msg_lower for pat in timer_patterns) or msg_lower in ("yes", "haan", "sure", "start"):
+            dur = context.get("current_step", {}).get("estimated_duration_seconds") if context.get("current_step") else None
+            mins = round(dur / 60) if dur and dur >= 60 else (dur or 5)
+            unit_str = f"{mins} minutes" if dur and dur >= 60 else f"{mins} seconds"
+            return AnswerQuestionDecision(
+                type="answer_question",
+                question=user_message,
+                answer=f"⏱️ Timer started for {unit_str}! I will ring a cheerful bell when the time is up. Keep an eye on your heat in the meantime.",
+            )
+
+        # 3. General culinary questions (distinguished from step completions)
         question_keywords = ["why do we", "how long", "what temperature", "kitni dair", "kyun"]
         if any(kw in msg_lower for kw in question_keywords):
             return AnswerQuestionDecision(

@@ -127,7 +127,13 @@ class ChatService:
                     reply = "🎉 Bohat khoob! All cooking steps completed! Nosh-e-Jaan / Enjoy your meal!"
                 elif updated_session.current_step:
                     curr = updated_session.current_step
-                    reply = f"✅ Step marked completed! Next up: Step {curr.step_number} - {curr.instruction}"
+                    timer_suffix = ""
+                    if curr.estimated_duration_seconds and curr.estimated_duration_seconds >= 60:
+                        mins = round(curr.estimated_duration_seconds / 60)
+                        timer_suffix = f"\n\n⏱️ Shall I start the timer for {mins} minutes?"
+                    elif curr.estimated_duration_seconds and curr.estimated_duration_seconds > 0:
+                        timer_suffix = f"\n\n⏱️ Shall I start the timer for {curr.estimated_duration_seconds} seconds?"
+                    reply = f"✅ Step marked completed! Next up: Step {curr.step_number} - {curr.instruction}{timer_suffix}"
                 else:
                     reply = "Step marked completed!"
             elif decision.action == "skip_step":
@@ -135,7 +141,13 @@ class ChatService:
                     reply = "⏭️ Step skipped. All cooking steps are now finished."
                 elif updated_session.current_step:
                     curr = updated_session.current_step
-                    reply = f"⏭️ Step skipped. Proceed to Step {curr.step_number} - {curr.instruction}"
+                    timer_suffix = ""
+                    if curr.estimated_duration_seconds and curr.estimated_duration_seconds >= 60:
+                        mins = round(curr.estimated_duration_seconds / 60)
+                        timer_suffix = f"\n\n⏱️ Shall I start the timer for {mins} minutes?"
+                    elif curr.estimated_duration_seconds and curr.estimated_duration_seconds > 0:
+                        timer_suffix = f"\n\n⏱️ Shall I start the timer for {curr.estimated_duration_seconds} seconds?"
+                    reply = f"⏭️ Step skipped. Proceed to Step {curr.step_number} - {curr.instruction}{timer_suffix}"
                 else:
                     reply = "Step skipped."
             elif decision.action in ("get_current_step", "get_current_state"):
