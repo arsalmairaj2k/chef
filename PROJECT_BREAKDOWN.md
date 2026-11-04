@@ -11,7 +11,7 @@
 > *"Chef AI is an intelligent, voice-first culinary assistant purpose-built for Pakistani and South Asian cooking. Unlike generic conversational bots that suffer from hallucination and memory drift, Chef AI couples an LLM language-interpretation layer with a deterministic, authoritative backend state machine. The LLM translates multilingual, natural speech (Urdu, Roman Urdu, English) into validated intent proposals, while FastAPI and SQLAlchemy own the recipe progression, timer validation, and ingredient scaling. I took this project from architectural design to a production deployment with 116 automated tests, sub-7-second reasoning latency, and full session recovery across browser reloads."*
 
 ### Key Metrics & Highlights
-- **116 Automated Tests**: Complete unit and integration test coverage running in `<3.5 seconds` using in-memory SQLite and deterministic fake providers.
+- **117 Automated Tests**: Complete unit and integration test coverage running in `<3.5 seconds` using in-memory SQLite and deterministic fake providers.
 - **Latency Optimization**: Reduced response turnaround from **58 seconds down to 5–8 seconds** (an 88% latency drop) by tuning model thinking budgets and eliminating redundant LLM roundtrips.
 - **Resilient AI Layer**: Self-healing LLM provider featuring an automatic 4-model fallback cascade across quota limits (HTTP 429) and demand spikes (HTTP 503).
 - **Session Durability**: Dual-tier persistence (relational database transcript + URL query param syncing) ensuring zero state loss on page refresh.
@@ -272,6 +272,19 @@ Interviewers evaluate engineers based on how they troubleshoot and resolve compl
 
 ---
 
+### Challenge 7: Proactive Cooking Timers & Client-Side Audio Alarm Architecture
+- **The Symptom**: Cooking tasks requiring timing (e.g., simmering daal for 15 mins, searing chicken for 5 mins) required the cook to manually track time. If a server-side timer thread or sleep loop were used, it would block ASGI worker processes or drift whenever users refresh or send intermediate questions.
+- **Root Cause & Constraints**:
+  1. *No Server-Side Blocking*: Web servers must never run `time.sleep()` loops for client timers.
+  2. *Auditory Feedback*: Timers must play an acoustic, non-annoying alarm (~1.5s bell chime) when expired without relying on external MP3 URLs that can break, throw CORS errors, or fail due to network restrictions.
+  3. *Conversational Proactivity*: Chef AI must proactively ask *"Shall I start the timer for X minutes?"* before entering a timed step.
+- **The Solution**:
+  1. **Prompt Directive & Response Decoration**: Enhanced system prompts and action handlers (`complete_step`, `skip_step`) to compute step duration and ask proactively: `\n\n⏱️ Shall I start the timer for {mins} minutes?`.
+  2. **Synthesized Web Audio API**: Implemented a dual-strike acoustic brass bell synthesized purely in client-side JavaScript via `AudioContext` and harmonic sine oscillators (Strike 1 at 880Hz/1318Hz/1760Hz, Strike 2 at 1174Hz/1760Hz/2349Hz, 1.4-second natural exponential decay). Zero external network requests, zero broken assets.
+  3. **SessionStorage Resiliency**: Persisted countdown timestamps in browser `sessionStorage` (`chef_timer_{session_id}_{step_num}`) so Streamlit component re-renders and ongoing chat inputs never interrupt or reset the running timer.
+
+---
+
 ## 8. Testing Strategy & Quality Assurance
 
 Chef AI adopts a strict testing pyramid ensuring high velocity without burning LLM tokens:
@@ -324,5 +337,5 @@ Chef AI adopts a strict testing pyramid ensuring high velocity without burning L
 - [x] **Architecture**: Decoupled LLM Intent Classifier + Authoritative Relational State Machine.
 - [x] **Languages & Frameworks**: Python 3.13, FastAPI, SQLAlchemy 2.0, Pydantic v2, Streamlit.
 - [x] **AI Engineering**: Multilingual prompt engineering (Urdu/English code-switching), function/tool calling, provider abstraction, thinking budget optimization.
-- [x] **Testing**: 116 tests passing, deterministic fake providers, SQLite in-memory fixtures.
+- [x] **Testing**: 117 tests passing, deterministic fake providers, SQLite in-memory fixtures.
 - [x] **Production Readiness**: Deployed on Render & Streamlit Cloud, CORS configured, health monitoring, URL query parameter session recovery.
