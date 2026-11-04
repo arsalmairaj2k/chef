@@ -188,7 +188,17 @@ class ChatService:
 
         elif decision.type == "answer_question":
             # Direct response from decision without redundant second roundtrip
-            reply = decision.answer if getattr(decision, "answer", None) else "Here is the guidance for your recipe."
+            reply = (
+                getattr(decision, "answer", None)
+                or getattr(decision, "reply", None)
+                or getattr(decision, "text", None)
+            )
+            if not reply:
+                lower_m = cleaned_msg.lower()
+                if any(w in lower_m for w in ("timer", "yes", "haan", "start", "shuru", "ji")):
+                    reply = "⏱️ Timer shuru kar diya hai! Jab waqt poora hoga, bell bajegi. Cooking par tawajjoh rakhein!"
+                else:
+                    reply = "Here is the guidance for your recipe."
             response_obj = ChatMessageResponse(
                 reply=reply,
                 session=session_read,

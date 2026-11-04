@@ -255,11 +255,18 @@ Respond strictly with a JSON object representing your decision. It MUST match on
                 if "question" not in parsed_json or not parsed_json["question"]:
                     parsed_json["question"] = user_message
                 if "answer" not in parsed_json or not parsed_json["answer"]:
-                    parsed_json["answer"] = (
-                        parsed_json.get("text")
+                    fallback_reply = (
+                        parsed_json.get("reply")
+                        or parsed_json.get("text")
                         or parsed_json.get("response")
-                        or "Here is the culinary guidance for your current step."
                     )
+                    if not fallback_reply:
+                        lower_m = user_message.lower()
+                        if any(w in lower_m for w in ("timer", "yes", "haan", "start", "shuru", "ji")):
+                            fallback_reply = "⏱️ Timer shuru kar diya hai! Jab waqt poora hoga, bell bajegi. Cooking par tawajjoh rakhein!"
+                        else:
+                            fallback_reply = "Here is the culinary guidance for your current step."
+                    parsed_json["answer"] = fallback_reply
                 return AnswerQuestionDecision.model_validate(parsed_json)
 
             elif decision_type == "clarify":
