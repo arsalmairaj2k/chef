@@ -56,7 +56,7 @@ def test_api_transcribe_audio_valid(client: TestClient):
     data = response.json()
     assert "transcription" in data
     assert data["filename"] == "test.wav"
-    assert data["model"] == "whisper-large-v3"
+    assert "whisper-large-v3" in data["model"]
 
 
 def test_api_session_voice_nonexistent_session(client: TestClient):

@@ -23,9 +23,9 @@ class Settings(BaseSettings):
     llm_max_retries: int = 2
     llm_max_message_length: int = 1000
 
-    # Speech-to-Text (STT) Settings via Groq Whisper
+    # Speech-to-Text (STT) Settings via Groq Whisper (turbo is 2.2x faster)
     groq_api_key: str | None = None
-    groq_whisper_model: str = "whisper-large-v3"
+    groq_whisper_model: str = "whisper-large-v3-turbo"
 
     model_config = SettingsConfigDict(
         env_file=".env",
