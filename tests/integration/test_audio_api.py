@@ -79,3 +79,4 @@ def test_api_session_voice_full_loop(client: TestClient, test_session_id: int):
     assert "session" in data
     assert "decision_type" in data
     assert data["session"]["id"] == test_session_id
+

@@ -1,7 +1,15 @@
 import io
 import logging
 from typing import Optional
-from groq import Groq, APIError, RateLimitError, AuthenticationError
+
+try:
+    from groq import Groq, APIError, RateLimitError, AuthenticationError
+except ImportError:
+    Groq = None  # type: ignore
+    APIError = Exception  # type: ignore
+    RateLimitError = Exception  # type: ignore
+    AuthenticationError = Exception  # type: ignore
+
 from app.core.config import get_settings
 from app.ai.providers import get_llm_provider
 from app.ai.providers.fake import FakeLLMProvider
@@ -61,15 +69,22 @@ class AudioTranscriptionService:
 
         settings = get_settings()
         effective_key = api_key or settings.groq_api_key
-
-        # Offline/Testing Mock Mode: Allows automated CI/CD and offline tests to pass without API keys
         current_provider = get_llm_provider()
+
+        # Offline/Testing Mock Mode: Deterministic mock for unit/integration tests with FakeLLMProvider
+        if isinstance(current_provider, FakeLLMProvider) or settings.app_env == "test":
+            logger.info("Using mock audio transcription for test environment.")
+            return "Maine chicken fry kar liya hai, agla step kya hai?"
+
         if not effective_key:
-            if settings.app_env == "test" or settings.llm_provider == "fake" or isinstance(current_provider, FakeLLMProvider):
-                logger.info("Using mock audio transcription for test environment.")
-                return "Maine chicken fry kar liya hai, agla step kya hai?"
             raise GroqMissingKeyError(
                 "Groq API key not configured. Get a free key at https://console.groq.com and set GROQ_API_KEY in .env"
+            )
+
+        if Groq is None:
+            raise AudioTranscriptionError(
+                "The 'groq' package is not installed on the server. Please add 'groq>=0.9.0' to requirements.txt.",
+                status_code=503,
             )
 
         try:

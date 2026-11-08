@@ -39,8 +39,9 @@ def test_transcribe_raises_missing_key_in_production():
             assert exc_info.value.status_code == 503
 
 
+@patch("app.services.audio_service.get_llm_provider", return_value=None)
 @patch("app.services.audio_service.Groq")
-def test_transcribe_successful_groq_call(mock_groq_class):
+def test_transcribe_successful_groq_call(mock_groq_class, mock_provider):
     mock_client = MagicMock()
     mock_transcription = MagicMock()
     mock_transcription.text = "Chicken fry ho gaya hai agla step"
@@ -54,8 +55,9 @@ def test_transcribe_successful_groq_call(mock_groq_class):
     mock_client.audio.transcriptions.create.assert_called_once()
 
 
+@patch("app.services.audio_service.get_llm_provider", return_value=None)
 @patch("app.services.audio_service.Groq")
-def test_transcribe_handles_rate_limit(mock_groq_class):
+def test_transcribe_handles_rate_limit(mock_groq_class, mock_provider):
     mock_client = MagicMock()
     request = httpx.Request("POST", "https://api.groq.com")
     response = httpx.Response(429, request=request)
@@ -69,8 +71,9 @@ def test_transcribe_handles_rate_limit(mock_groq_class):
     assert exc_info.value.status_code == 429
 
 
+@patch("app.services.audio_service.get_llm_provider", return_value=None)
 @patch("app.services.audio_service.Groq")
-def test_transcribe_handles_auth_error(mock_groq_class):
+def test_transcribe_handles_auth_error(mock_groq_class, mock_provider):
     mock_client = MagicMock()
     request = httpx.Request("POST", "https://api.groq.com")
     response = httpx.Response(401, request=request)

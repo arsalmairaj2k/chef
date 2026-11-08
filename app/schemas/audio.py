@@ -22,3 +22,4 @@ class VoiceMessageResponse(BaseModel):
     action: Optional[ActionExecutionSummary] = Field(None, description="Details of executed action if applicable")
 
     model_config = ConfigDict(from_attributes=True)
+
