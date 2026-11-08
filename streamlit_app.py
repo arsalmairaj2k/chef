@@ -340,6 +340,8 @@ if "servings" not in st.session_state:
     st.session_state.servings = 4
 if "timer_auto_start" not in st.session_state:
     st.session_state.timer_auto_start = False
+if "last_processed_audio_hash" not in st.session_state:
+    st.session_state.last_processed_audio_hash = None
 
 # -----------------------------------------------------------------------------
 # SIDEBAR / NAVIGATION
@@ -395,6 +397,17 @@ if is_healthy:
 else:
     st.sidebar.markdown('<span class="badge-pill" style="background:#FEF2F2; color:#B91C1C; border:1px solid #FECACA;">● Backend Disconnected</span>', unsafe_allow_html=True)
     st.sidebar.caption("Run: `.venv\\Scripts\\python -m uvicorn app.main:app --reload`")
+
+st.sidebar.markdown(
+    """
+    <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:10px 14px; margin-top:8px; margin-bottom:12px;">
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:#475569; font-weight:700;">🎙️ Voice Engine</div>
+        <div style="font-size:13px; font-weight:600; color:#0F172A; margin-top:2px;">Groq Whisper Large v3</div>
+        <div style="font-size:11px; color:#64748B;">English & Roman Urdu Speech</div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 def fetch_recipes():
     try:
@@ -1105,6 +1118,63 @@ if st.session_state.session_id:
                             "session_start": '<span class="decision-tag tag-execute">✨ Session Active</span>'
                         }.get(d, f'<span class="decision-tag tag-answer">{d}</span>')
                         st.markdown(tag_html, unsafe_allow_html=True)
+
+        # Hands-Free Voice Input (Groq Whisper)
+        with st.expander("🎙️ Hands-Free Voice Mode (Groq Whisper)", expanded=False):
+            st.caption("Record your cooking question or update in English or Roman Urdu:")
+            voice_recording = st.audio_input("Record audio", label_visibility="collapsed", key="voice_mic_input")
+            if voice_recording is not None:
+                audio_bytes = voice_recording.read()
+                audio_hash = hash(audio_bytes)
+                if st.session_state.get("last_processed_audio_hash") != audio_hash:
+                    st.session_state["last_processed_audio_hash"] = audio_hash
+                    with st.spinner("🎙️ Transcribing with Groq Whisper & updating recipe state..."):
+                        try:
+                            files = {"file": ("recording.wav", audio_bytes, "audio/wav")}
+                            res = requests.post(
+                                f"{API_BASE_URL}/sessions/{st.session_state.session_id}/voice",
+                                files=files,
+                                timeout=120,
+                            )
+                            if res.status_code == 200:
+                                v_data = res.json()
+                                user_transcription = v_data.get("transcription", "")
+                                reply = v_data.get("reply", "")
+                                decision = v_data.get("decision_type", "")
+                                session_info = v_data.get("session", {})
+
+                                # Check timer affirmation in transcribed voice
+                                low_in = user_transcription.strip().lower()
+                                affirmations = ["yes", "start timer", "start", "haan", "haan timer shuru kardo", "haan shuru kardo", "sure", "yes please", "ji", "ok start timer", "start the timer"]
+                                if any(low_in == a or low_in.startswith(a) for a in affirmations):
+                                    st.session_state.timer_auto_start = True
+
+                                if session_info:
+                                    st.session_state.current_step_number = session_info.get("current_step_number", st.session_state.current_step_number)
+                                    st.session_state.session_status = session_info.get("status", st.session_state.session_status)
+                                    curr_step = session_info.get("current_step")
+                                    if curr_step and "instruction" in curr_step:
+                                        st.session_state.current_instruction = curr_step["instruction"]
+                                        st.session_state.est_duration = curr_step.get("estimated_duration_seconds")
+                                    elif session_info.get("status") == "COMPLETED":
+                                        st.session_state.current_instruction = "🎉 Recipe Completed! Nosh-e-Jaan / Enjoy your meal!"
+
+                                st.session_state.chat_history.append({
+                                    "role": "user",
+                                    "content": f"🎙️ **Voice:** *\"{user_transcription}\"*",
+                                })
+                                st.session_state.chat_history.append({
+                                    "role": "assistant",
+                                    "content": reply,
+                                    "decision": decision,
+                                })
+                                st.rerun()
+                            elif res.status_code == 503:
+                                st.error("⚠️ **Groq API Key Required:** Please configure `GROQ_API_KEY` in your backend `.env` file to enable live Groq Whisper voice mode.")
+                            else:
+                                st.error(f"⚠️ Voice processing notice ({res.status_code}): {res.text}")
+                        except Exception as e:
+                            st.error(f"Voice transmission error: {e}")
 
         # Inbound Chat Input
         user_input = st.chat_input("Speak or type in English, Roman Urdu, or Urdu...")

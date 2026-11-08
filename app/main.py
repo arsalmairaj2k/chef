@@ -8,6 +8,7 @@ from app.api.recipes import router as recipes_router
 from app.api.sessions import router as sessions_router
 from app.api.actions import router as actions_router
 from app.api.chat import router as chat_router
+from app.api.audio import router as audio_router
 from app.database.base import Base
 from app.database.session import engine, SessionLocal
 import app.models  # noqa: F401
@@ -70,6 +71,10 @@ def create_app() -> FastAPI:
     # Chat Interaction API under /api/v1/sessions and /sessions
     app.include_router(chat_router)
     app.include_router(chat_router, prefix=settings.api_v1_prefix)
+
+    # Audio & Voice Processing API
+    app.include_router(audio_router)
+    app.include_router(audio_router, prefix=settings.api_v1_prefix)
 
     @app.get("/", tags=["root"])
     async def root():
