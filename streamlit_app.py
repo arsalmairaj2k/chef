@@ -1,6 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import requests
+import time
 
 # -----------------------------------------------------------------------------
 # PAGE CONFIGURATION & ELEGANT ALL-WHITE THEME
@@ -382,19 +383,74 @@ if not raw_host.endswith("/api/v1"):
 else:
     API_BASE_URL = raw_host
 
-def check_health():
+def probe_backend(timeout: float = 3.0):
+    """Probe the health endpoint with a configurable timeout."""
     try:
-        r = requests.get(f"{API_BASE_URL}/health", timeout=10)
+        r = requests.get(f"{API_BASE_URL}/health", timeout=timeout)
         if r.status_code == 200:
             return True, r.json().get("version", "0.1.0")
     except Exception:
         pass
     return False, None
 
-is_healthy, app_ver = check_health()
-if is_healthy:
+@st.cache_data(ttl=25, show_spinner=False)
+def check_health_cached():
+    return probe_backend(timeout=2.5)
+
+# Fast non-blocking cached probe
+is_healthy, app_ver = check_health_cached()
+is_remote_cloud = ("onrender.com" in API_BASE_URL) or ("127.0.0.1" not in API_BASE_URL and "localhost" not in API_BASE_URL)
+
+if not is_healthy and is_remote_cloud:
+    # Cloud server (Render free tier) spins down after 15 mins of inactivity.
+    # Provide an automatic, animated warm-up experience with auto-retry.
+    st.sidebar.markdown('<span class="badge-pill" style="background:#FEF3C7; color:#B45309; border:1px solid #FDE68A;">⚡ Waking Up Server...</span>', unsafe_allow_html=True)
+    st.sidebar.caption("Render free instance is booting up (~30s).")
+
+    warmup_box = st.empty()
+    with warmup_box.container():
+        st.markdown(
+            """
+            <div style="background:#FFFBEB; border:1px solid #FDE68A; border-radius:16px; padding:20px 24px; margin-bottom:24px;">
+                <div style="display:flex; align-items:center; gap:14px;">
+                    <div style="font-size:28px;">⚡</div>
+                    <div>
+                        <h3 style="margin:0; font-size:18px; color:#92400E; font-family:'Playfair Display', serif;">Waking up Chef AI Cloud Backend...</h3>
+                        <p style="margin:6px 0 0 0; font-size:14px; color:#B45309; line-height:1.5;">
+                            Render free instances spin down after 15 minutes of inactivity to conserve resources.
+                            Your server is booting up right now. <b>This page will connect automatically once ready — no need to refresh!</b>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        boot_progress = st.progress(15, text="Connecting to cloud server and initializing database...")
+        # Poll up to 7 attempts (approx 25 seconds)
+        for step in range(1, 8):
+            time.sleep(3.5)
+            boot_progress.progress(min(15 + step * 12, 95), text=f"Booting application services... ({step * 4}s)")
+            healthy_now, ver_now = probe_backend(timeout=3.5)
+            if healthy_now:
+                is_healthy = True
+                app_ver = ver_now
+                boot_progress.progress(100, text="Connected successfully! Loading recipes...")
+                time.sleep(0.4)
+                st.cache_data.clear()
+                warmup_box.empty()
+                st.rerun()
+
+    if not is_healthy:
+        st.warning("The cloud server is taking a little longer to wake up. Click the button below to check connection:")
+        if st.button("🔄 Connect Now", type="primary", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+
+elif is_healthy:
     st.sidebar.markdown(f'<span class="badge-pill" style="background:#F0FDF4; color:#15803D; border:1px solid #BBF7D0;">● System Online v{app_ver}</span>', unsafe_allow_html=True)
 else:
+    # Truly local disconnected instance
     st.sidebar.markdown('<span class="badge-pill" style="background:#FEF2F2; color:#B91C1C; border:1px solid #FECACA;">● Backend Disconnected</span>', unsafe_allow_html=True)
     st.sidebar.caption("Run: `.venv\\Scripts\\python -m uvicorn app.main:app --reload`")
 
@@ -402,29 +458,34 @@ st.sidebar.markdown(
     """
     <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:10px 14px; margin-top:8px; margin-bottom:12px;">
         <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:#475569; font-weight:700;">🎙️ Voice Engine</div>
-        <div style="font-size:13px; font-weight:600; color:#0F172A; margin-top:2px;">Groq Whisper Large v3</div>
-        <div style="font-size:11px; color:#64748B;">English & Roman Urdu Speech</div>
+        <div style="font-size:13px; font-weight:600; color:#0F172A; margin-top:2px;">Groq Whisper Turbo</div>
+        <div style="font-size:11px; color:#64748B;">Sub-200ms Urdu & English STT</div>
     </div>
     """,
     unsafe_allow_html=True
 )
 
-def fetch_recipes():
+@st.cache_data(ttl=120, show_spinner=False)
+def fetch_recipes_cached():
     try:
-        res = requests.get(f"{API_BASE_URL}/recipes", timeout=25)
+        res = requests.get(f"{API_BASE_URL}/recipes", timeout=12)
         if res.status_code == 200:
             return res.json().get("items", [])
     except Exception:
         pass
     return []
 
+def fetch_recipes():
+    return fetch_recipes_cached()
+
 def start_new_session(recipe_id: int, servings_count: int):
-    try:
-        res = requests.post(
-            f"{API_BASE_URL}/sessions",
-            json={"recipe_id": recipe_id, "servings": servings_count},
-            timeout=60
-        )
+    with st.spinner("Initializing cooking session with Chef AI..."):
+        try:
+            res = requests.post(
+                f"{API_BASE_URL}/sessions",
+                json={"recipe_id": recipe_id, "servings": servings_count},
+                timeout=60
+            )
         if res.status_code == 201:
             data = res.json()
             steps = data.get("steps", [])

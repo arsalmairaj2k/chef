@@ -1,0 +1,17 @@
+name: Keep Render Backend Awake
+
+on:
+  schedule:
+    # Ping every 12 minutes to prevent Render free instance from spinning down (sleep threshold is 15 mins)
+    - cron: '*/12 * * * *'
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Chef AI Health Endpoint
+        run: |
+          echo "Pinging Chef AI backend on Render..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 https://chef-zce2.onrender.com/api/v1/health || true)
+          echo "Health check HTTP status: $HTTP_STATUS"
