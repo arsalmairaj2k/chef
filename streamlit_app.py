@@ -341,6 +341,10 @@ if "servings" not in st.session_state:
     st.session_state.servings = 4
 if "timer_auto_start" not in st.session_state:
     st.session_state.timer_auto_start = False
+if "timer_action" not in st.session_state:
+    st.session_state.timer_action = None
+if "timer_nonce" not in st.session_state:
+    st.session_state.timer_nonce = 0
 if "last_processed_audio_hash" not in st.session_state:
     st.session_state.last_processed_audio_hash = None
 
@@ -477,6 +481,65 @@ def fetch_recipes_cached():
 
 def fetch_recipes():
     return fetch_recipes_cached()
+
+def is_timer_start_request(user_msg: str, last_assistant_msg: str = "") -> bool:
+    """Robust detection of timer start intent across English, Urdu, and Roman Urdu."""
+    if not user_msg:
+        return False
+    low_u = user_msg.strip().lower()
+    clean_u = re.sub(r"[^\w\s]", " ", low_u)
+    clean_u = " ".join(clean_u.split())
+
+    # 1. Any mention of timer with activation / action words
+    has_timer_word = any(w in clean_u.split() for w in ["timer", "taimar", "time"])
+    timer_start_verbs = [
+        "start", "shuru", "laga", "lagao", "lagado", "lagade", "chala", "chalao", "chalado", "chalade",
+        "on", "kardo", "karduhu", "kar do", "karo", "karde", "chalain", "chalein", "run", "play", "set"
+    ]
+    if has_timer_word and any(w in clean_u for w in timer_start_verbs):
+        return True
+
+    # 2. Standalone start / timer commands
+    direct_commands = [
+        "timer", "start timer", "timer start", "start the timer", "set timer", "set a timer",
+        "timer on", "timer please", "run timer", "timer chalao", "timer shuru", "timer lagao",
+        "timer lagado", "timer shuru kardo", "timer start kardo", "timer start karduhu"
+    ]
+    if any(clean_u == cmd or clean_u.startswith(cmd) for cmd in direct_commands):
+        return True
+
+    # 3. Affirmation if the previous assistant message asked about starting a timer
+    low_last = last_assistant_msg.lower() if last_assistant_msg else ""
+    timer_offered = any(phrase in low_last for phrase in [
+        "start the timer", "timer shuru", "shall i start", "kya main", "timer for"
+    ])
+    if timer_offered:
+        affirmations = [
+            "yes", "yeah", "yup", "yep", "sure", "ok", "okay", "haan", "ha", "ji", "jee",
+            "kardo", "kar do", "karduhu", "kar dain", "theek hai", "bilkul", "start", "shuru",
+            "chalain", "chalo", "go", "go ahead", "please", "yes please", "haan ji", "haan kardo"
+        ]
+        tokens = clean_u.split()
+        if any(clean_u == a or clean_u.startswith(a) for a in affirmations) or (tokens and tokens[0] in affirmations):
+            return True
+
+    return False
+
+def is_timer_pause_request(user_msg: str) -> bool:
+    """Detect pause timer intent."""
+    if not user_msg:
+        return False
+    clean_u = re.sub(r"[^\w\s]", " ", user_msg.strip().lower())
+    clean_u = " ".join(clean_u.split())
+    return any(p in clean_u for p in ["pause timer", "timer pause", "timer roko", "stop timer", "pause the timer", "timer rok do", "roko timer"])
+
+def is_timer_reset_request(user_msg: str) -> bool:
+    """Detect reset timer intent."""
+    if not user_msg:
+        return False
+    clean_u = re.sub(r"[^\w\s]", " ", user_msg.strip().lower())
+    clean_u = " ".join(clean_u.split())
+    return any(p in clean_u for p in ["reset timer", "timer reset", "restart timer", "timer restart", "timer dobara", "timer phirse", "reset the timer"])
 
 def start_new_session(recipe_id: int, servings_count: int):
     try:
@@ -740,6 +803,10 @@ if st.session_state.session_id:
             dur_mins = round(dur_sec / 60) if dur_sec >= 60 else None
             dur_label = f"{dur_mins} mins" if dur_mins else f"{dur_sec}s"
 
+            timer_action = st.session_state.get("timer_action")
+            timer_auto_start = st.session_state.get("timer_auto_start", False)
+            timer_nonce = st.session_state.get("timer_nonce", 0)
+
             timer_component_html = f"""
             <!DOCTYPE html>
             <html>
@@ -905,7 +972,9 @@ if st.session_state.session_id:
                 const sessionId = "{st.session_state.session_id}";
                 const stepNum = {st.session_state.current_step_number};
                 const totalDuration = {dur_sec};
-                const autoStart = {"true" if st.session_state.get("timer_auto_start", False) else "false"};
+                const timerAction = "{timer_action or ''}";
+                const autoStart = {"true" if (timer_auto_start or timer_action == 'start') else "false"};
+                const timerNonce = {timer_nonce};
                 const storageKey = "chef_timer_" + sessionId + "_" + stepNum;
 
                 const clockEl = document.getElementById("clock-display");
@@ -925,6 +994,9 @@ if st.session_state.session_id:
                         const AudioCtx = window.AudioContext || window.webkitAudioContext;
                         if (!AudioCtx) return;
                         const ctx = new AudioCtx();
+                        if (ctx.state === "suspended") {{
+                            ctx.resume();
+                        }}
                         const now = ctx.currentTime;
 
                         // Tone 1 at t=0: Bright strike (880Hz + 1318.5Hz + 1760Hz)
@@ -1127,8 +1199,14 @@ if st.session_state.session_id:
                 btnReset.addEventListener("click", resetTimer);
                 btnAddMin.addEventListener("click", addOneMin);
 
-                if (autoStart && !state.isRunning && state.remainingSeconds > 0) {{
-                    startTimer();
+                if (timerAction === "start" || (autoStart && !state.isRunning && state.remainingSeconds > 0)) {{
+                    if (!state.isRunning) {{
+                        startTimer();
+                    }}
+                }} else if (timerAction === "pause") {{
+                    pauseTimer();
+                }} else if (timerAction === "reset") {{
+                    resetTimer();
                 }} else if (state.isRunning) {{
                     intervalId = setInterval(tick, 1000);
                 }}
@@ -1141,6 +1219,7 @@ if st.session_state.session_id:
             """
             components.html(timer_component_html, height=180, scrolling=False)
             st.session_state.timer_auto_start = False
+            st.session_state.timer_action = None
 
         # Quick Action Shortcuts (Hands-Free simulation)
         st.caption("Quick actions:")
@@ -1159,6 +1238,8 @@ if st.session_state.session_id:
             st.rerun()
         if btn_c5.button("⏱️ Timer", use_container_width=True, type="secondary"):
             st.session_state.timer_auto_start = True
+            st.session_state.timer_action = "start"
+            st.session_state.timer_nonce = st.session_state.get("timer_nonce", 0) + 1
             st.session_state.pending_quick_message = "Start the timer for this step."
             st.rerun()
 
@@ -1172,12 +1253,19 @@ if st.session_state.session_id:
                     st.markdown(msg["content"])
                     if "decision" in msg and msg["decision"]:
                         d = msg["decision"]
-                        tag_html = {
-                            "execute_action": '<span class="decision-tag tag-execute">🟢 Action Verified</span>',
-                            "answer_question": '<span class="decision-tag tag-answer">🔵 Culinary Advice</span>',
-                            "clarify": '<span class="decision-tag tag-clarify">🟠 Clarification Requested</span>',
-                            "session_start": '<span class="decision-tag tag-execute">✨ Session Active</span>'
-                        }.get(d, f'<span class="decision-tag tag-answer">{d}</span>')
+                        is_timer_reply = (
+                            msg.get("role") == "assistant"
+                            and any(phrase in msg.get("content", "").lower() for phrase in ["timer started", "⏱️ timer started", "timer shuru", "timer is running", "timer set for", "timer has started"])
+                        )
+                        if is_timer_reply:
+                            tag_html = '<span class="decision-tag tag-execute">⏱️ Timer Started</span>'
+                        else:
+                            tag_html = {
+                                "execute_action": '<span class="decision-tag tag-execute">🟢 Action Verified</span>',
+                                "answer_question": '<span class="decision-tag tag-answer">🔵 Culinary Advice</span>',
+                                "clarify": '<span class="decision-tag tag-clarify">🟠 Clarification Requested</span>',
+                                "session_start": '<span class="decision-tag tag-execute">✨ Session Active</span>'
+                            }.get(d, f'<span class="decision-tag tag-answer">{d}</span>')
                         st.markdown(tag_html, unsafe_allow_html=True)
 
         # Hands-Free Voice Input (Groq Whisper Turbo)
@@ -1219,11 +1307,23 @@ if st.session_state.session_id:
             st.session_state.pending_quick_message = None
 
         if user_input:
-            # Check if user affirms or requests timer start
-            low_in = user_input.strip().lower()
-            affirmations = ["yes", "start timer", "start", "haan", "haan timer shuru kardo", "haan shuru kardo", "sure", "yes please", "ji", "ok start timer", "start the timer"]
-            if any(low_in == a or low_in.startswith(a) for a in affirmations):
+            # Check if user affirms or requests timer control (start / pause / reset)
+            last_assistant_msg = ""
+            for m in reversed(st.session_state.chat_history):
+                if m.get("role") == "assistant":
+                    last_assistant_msg = m.get("content", "")
+                    break
+
+            if is_timer_start_request(user_input, last_assistant_msg):
                 st.session_state.timer_auto_start = True
+                st.session_state.timer_action = "start"
+                st.session_state.timer_nonce = st.session_state.get("timer_nonce", 0) + 1
+            elif is_timer_pause_request(user_input):
+                st.session_state.timer_action = "pause"
+                st.session_state.timer_nonce = st.session_state.get("timer_nonce", 0) + 1
+            elif is_timer_reset_request(user_input):
+                st.session_state.timer_action = "reset"
+                st.session_state.timer_nonce = st.session_state.get("timer_nonce", 0) + 1
 
             st.session_state.chat_history.append({"role": "user", "content": user_input})
             with st.chat_message("user", avatar="👤"):
@@ -1241,6 +1341,12 @@ if st.session_state.session_id:
                         reply = data.get("reply", "")
                         decision = data.get("decision_type", "")
                         session_info = data.get("session", {})
+
+                        # If AI reply confirms timer start, guarantee timer starts regardless of user phrasing
+                        if any(phrase in reply.lower() for phrase in ["timer started", "⏱️ timer started", "timer shuru", "timer is running", "timer set for", "timer has started"]):
+                            st.session_state.timer_auto_start = True
+                            st.session_state.timer_action = "start"
+                            st.session_state.timer_nonce = st.session_state.get("timer_nonce", 0) + 1
 
                         if session_info:
                             st.session_state.current_step_number = session_info.get("current_step_number", st.session_state.current_step_number)
