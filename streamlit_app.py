@@ -479,8 +479,8 @@ def fetch_recipes():
     return fetch_recipes_cached()
 
 def start_new_session(recipe_id: int, servings_count: int):
-    with st.spinner("Initializing cooking session with Chef AI..."):
-        try:
+    try:
+        with st.spinner("Initializing cooking session with Chef AI..."):
             res = requests.post(
                 f"{API_BASE_URL}/sessions",
                 json={"recipe_id": recipe_id, "servings": servings_count},
