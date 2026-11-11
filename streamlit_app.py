@@ -368,20 +368,35 @@ st.sidebar.markdown(
 
 import os
 
-default_api_url = "http://127.0.0.1:8000/api/v1"
-if "API_BASE_URL" in os.environ:
-    default_api_url = os.environ["API_BASE_URL"]
-elif hasattr(st, "secrets") and "API_BASE_URL" in st.secrets:
-    default_api_url = st.secrets["API_BASE_URL"]
+DEFAULT_PRODUCTION_API_URL = "https://chef-zce2.onrender.com/api/v1"
 
-API_HOST_INPUT = st.sidebar.text_input(
-    "API Host",
-    value=default_api_url,
-    help="FastAPI backend endpoint (e.g. https://chef-backend-1c8v.onrender.com/api/v1)"
-)
+# Resolve backend URL securely without exposing API endpoint in public UI:
+# Priority 1: Environment variable (API_BASE_URL)
+# Priority 2: Streamlit secrets (st.secrets["API_BASE_URL"])
+# Priority 3: Hidden query parameter for debug (?api_url=... or ?api_host=...)
+# Priority 4: Auto-detect local backend if active on 127.0.0.1:8000, else default to production Render
+raw_api_url = os.environ.get("API_BASE_URL", "").strip()
+
+if not raw_api_url and hasattr(st, "secrets") and "API_BASE_URL" in st.secrets:
+    raw_api_url = str(st.secrets["API_BASE_URL"]).strip()
+
+if not raw_api_url and "api_url" in st.query_params:
+    raw_api_url = str(st.query_params["api_url"]).strip()
+elif not raw_api_url and "api_host" in st.query_params:
+    raw_api_url = str(st.query_params["api_host"]).strip()
+
+if not raw_api_url:
+    try:
+        local_probe = requests.get("http://127.0.0.1:8000/api/v1/health", timeout=0.3)
+        if local_probe.status_code == 200:
+            raw_api_url = "http://127.0.0.1:8000/api/v1"
+        else:
+            raw_api_url = DEFAULT_PRODUCTION_API_URL
+    except Exception:
+        raw_api_url = DEFAULT_PRODUCTION_API_URL
 
 # Normalize URL: strip whitespace and trailing slashes
-raw_host = API_HOST_INPUT.strip().rstrip("/")
+raw_host = raw_api_url.rstrip("/")
 if not raw_host.endswith("/api/v1"):
     API_BASE_URL = f"{raw_host}/api/v1"
 else:
