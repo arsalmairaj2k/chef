@@ -1,7 +1,9 @@
+import os
+import re
+import time
+import requests
 import streamlit as st
 import streamlit.components.v1 as components
-import requests
-import time
 
 # -----------------------------------------------------------------------------
 # PAGE CONFIGURATION & ELEGANT ALL-WHITE THEME
@@ -365,8 +367,6 @@ st.sidebar.markdown(
     """,
     unsafe_allow_html=True
 )
-
-import os
 
 DEFAULT_PRODUCTION_API_URL = "https://chef-zce2.onrender.com/api/v1"
 
