@@ -476,9 +476,9 @@ else:
 st.sidebar.markdown(
     """
     <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:10px 14px; margin-top:8px; margin-bottom:12px;">
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:#475569; font-weight:700;">🎙️ Voice Engine</div>
-        <div style="font-size:13px; font-weight:600; color:#0F172A; margin-top:2px;">Groq Whisper Turbo</div>
-        <div style="font-size:11px; color:#64748B;">Sub-200ms Urdu & English STT</div>
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:#475569; font-weight:700;">🎙️ Hands-Free Assistant</div>
+        <div style="font-size:13px; font-weight:600; color:#0F172A; margin-top:2px;">Chef Voice AI</div>
+        <div style="font-size:11px; color:#64748B;">Instant Urdu & English Recognition</div>
     </div>
     """,
     unsafe_allow_html=True
@@ -1283,9 +1283,9 @@ if st.session_state.session_id:
                             }.get(d, f'<span class="decision-tag tag-answer">{d}</span>')
                         st.markdown(tag_html, unsafe_allow_html=True)
 
-        # Hands-Free Voice Input (Groq Whisper Turbo)
-        with st.expander("🎙️ Hands-Free Voice Mode (Groq Whisper)", expanded=False):
-            st.caption("Record a voice update or question in English or Roman Urdu:")
+        # Hands-Free Voice Input (Chef Voice AI)
+        with st.expander("🎙️ Tap to Speak (Hands-Free Voice Mode)", expanded=False):
+            st.caption("Record a voice update or question in English, Roman Urdu, or Urdu:")
             voice_recording = st.audio_input("Record audio", label_visibility="collapsed", key="voice_mic_input")
             if voice_recording is not None:
                 audio_bytes = voice_recording.read()
@@ -1293,7 +1293,7 @@ if st.session_state.session_id:
                 if st.session_state.get("last_processed_audio_hash") != audio_hash:
                     st.session_state["last_processed_audio_hash"] = audio_hash
                     transcription = None
-                    with st.spinner("⚡ Transcribing voice with Groq Whisper (~180ms)..."):
+                    with st.spinner("⚡ Processing voice command..."):
                         try:
                             files = {"file": ("recording.wav", audio_bytes, "audio/wav")}
                             res = requests.post(
@@ -1305,7 +1305,7 @@ if st.session_state.session_id:
                                 t_data = res.json()
                                 transcription = t_data.get("transcription", "").strip()
                             elif res.status_code == 503:
-                                st.error("⚠️ **Groq API Key Required:** Please configure `GROQ_API_KEY` in your backend `.env` file or Render settings.")
+                                st.error("⚠️ **Voice Service Unavailable:** Voice configuration is missing or inactive. Please type your message.")
                             else:
                                 st.error(f"⚠️ Voice transcription notice ({res.status_code}): {res.text}")
                         except Exception as e:
